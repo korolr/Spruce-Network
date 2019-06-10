@@ -1,6 +1,6 @@
 /**
 *	nodes.cpp - Модуль отвечающий за работу с
-*	структурой нод сети tin.
+*	структурой нод сети TGN.
 *
 *	@mrrva - 2019
 */
@@ -16,10 +16,10 @@ using namespace std;
 *	@f_node - Ссылка для записи адреса ноды.
 *	@ip - Ip адрес искомой ноды.
 */
-bool _nodes::find_ip(struct tin_node &f_node,
+bool _nodes::find_ip(struct tgn_node &f_node,
 	string ip)
 {
-	for (auto &p : tinstruct::nodes)
+	for (auto &p : tgnstruct::nodes)
 		if (p.ip == ip) {
 			f_node = p;
 			return true;
@@ -34,10 +34,10 @@ bool _nodes::find_ip(struct tin_node &f_node,
 *	@f_node - Ссылка для записи адреса ноды.
 *	@hash - Hash искомой ноды.
 */
-bool _nodes::find_hash(struct tin_node &f_node,
+bool _nodes::find_hash(struct tgn_node &f_node,
 	unsigned char *hash)
 {
-	for (auto &p : tinstruct::nodes)
+	for (auto &p : tgnstruct::nodes)
 		if (memcmp(p.hash, hash, HASHSIZE)) {
 			f_node = p;
 			return true;
@@ -53,8 +53,8 @@ bool _nodes::find_hash(struct tin_node &f_node,
 */
 void _nodes::ping(struct sockaddr_in &skddr)
 {
-	struct tin_ipport ipport = ipport_get(skddr);
-	struct tin_node node;
+	struct tgn_ipport ipport = ipport_get(skddr);
+	struct tgn_node node;
 
 	if (ipport.ip.length() < 5 || 
 		ipport.port != PORT)
@@ -66,7 +66,7 @@ void _nodes::ping(struct sockaddr_in &skddr)
 	this->mute.lock();
 
 	node.ping = chrono::system_clock::now();
-	tinstorage::db.ping_node(ipport.ip);
+	tgnstorage::db.ping_node(ipport.ip);
 
 	this->mute.unlock();
 }
@@ -78,9 +78,9 @@ void _nodes::ping(struct sockaddr_in &skddr)
 */
 void _nodes::remove(string ip)
 {
-	using tinstruct::nodes;
+	using tgnstruct::nodes;
 
-	vector<struct tin_node>::iterator it;
+	vector<struct tgn_node>::iterator it;
 
 	if (ip.length() < 5 || nodes.empty())
 		return;
@@ -90,7 +90,7 @@ void _nodes::remove(string ip)
 
 	for (; it != nodes.end(); it++)
 		if ((*it).ip == ip) {
-			tinstorage::db.remove_node((*it).ip);
+			tgnstorage::db.remove_node((*it).ip);
 			nodes.erase(it);
 			break;
 		}
@@ -103,9 +103,9 @@ void _nodes::remove(string ip)
 *
 *	@node - Структура данных ноды.
 */
-bool _nodes::add(struct tin_node node)
+bool _nodes::add(struct tgn_node node)
 {
-	using tinstruct::nodes;
+	using tgnstruct::nodes;
 
 	string pub_key = bin2hex<HASHSIZE>(node.hash);
 	auto it = nodes.begin();
@@ -116,7 +116,7 @@ bool _nodes::add(struct tin_node node)
 
 	this->mute.lock();
 
-	tinstorage::db.new_node(node.ip, pub_key);
+	tgnstorage::db.new_node(node.ip, pub_key);
 	node.ping = chrono::system_clock::now();
 	nodes.push_back(node);
 
@@ -131,10 +131,10 @@ void _nodes::select(void)
 {
 	const short len = HASHSIZE * 2;
 	map<string, string> list;
-	struct tin_node node;
+	struct tgn_node node;
 	unsigned char *hash;
 
-	list = tinstorage::db.select_nodes();
+	list = tgnstorage::db.select_nodes();
 
 	if (list.empty())
 		return;
@@ -148,7 +148,7 @@ void _nodes::select(void)
 		node.ip = p.first;
 
 		if (hash != nullptr) {
-			tinstruct::nodes.push_back(node);
+			tgnstruct::nodes.push_back(node);
 			delete[] hash;
 		}
 	}
@@ -159,14 +159,14 @@ void _nodes::select(void)
 *	_nodes::get_last - Получение ноды которую дольше
 *	всего не использовали.
 */
-struct tin_node _nodes::get_last(void)
+struct tgn_node _nodes::get_last(void)
 {
 	auto last_t = chrono::system_clock::now();
-	struct tin_node node;
+	struct tgn_node node;
 
 	this->mute.lock();
 
-	for (auto &p : tinstruct::nodes)
+	for (auto &p : tgnstruct::nodes)
 		if (last_t > p.ping) {
 			last_t = p.ping;
 			node = p;

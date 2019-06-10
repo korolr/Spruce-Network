@@ -1,21 +1,21 @@
 /**
 *	message.hpp - Заголовочный файл децентрализованной
-*	сети tin. Здесь опублекованны все константы,
-*	прототипы, классы и структуры класса tinmsg.
+*	сети TGN. Здесь опублекованны все константы,
+*	прототипы, классы и структуры класса tgnmsg.
 *
 *	@mrrva - 2019
 */
-#ifndef TIN_MESSAGE
-#define TIN_MESSAGE
+#ifndef TGN_MESSAGE
+#define TGN_MESSAGE
 /**
 *	Главный заголовочный файл проекта.
 */
-#include "tin.hpp"
+#include "tgn.hpp"
 #include "struct.hpp"
 /**
 *	Доступные структуры.
 */
-enum tin_htype {
+enum tgn_htype {
 	INDEFINITE_MESSAGE	= 0x99,
 	/**
 	*	Клиентские типы сообщений.
@@ -64,7 +64,7 @@ struct find_request {
 /**
 *	Классы модуля.
 */
-class tinmsg {
+class tgnmsg {
 	private :
 		unsigned char bytes[FULLSIZE];
 		size_t length;
@@ -75,15 +75,15 @@ class tinmsg {
 		std::pair<unsigned char *, unsigned char *> info_garlic(void);
 		std::map<unsigned char *, std::string> info_nodes(void);
 		std::vector<unsigned char *> info_neighbors(void);
-		tinmsg(unsigned char *bytes = nullptr);
+		tgnmsg(unsigned char *bytes = nullptr);
 		struct find_request info_find(void);
-		enum tin_htype header_type(void);
+		enum tgn_htype header_type(void);
 		unsigned char *to_bytes(size_t &);
 		unsigned char *garlic_msg(void);
 		unsigned char *info_msg(void);
 		unsigned char *get_info(void);
 		unsigned char *byte_key(void);
-		void operator =(tinmsg &);
+		void operator =(tgnmsg &);
 		std::string str_key(void);
 		bool is_header_only(void);
 		bool is_node(void);
@@ -92,13 +92,13 @@ class tinmsg {
 *	Вспомогательные шаблоны и функции модуля.
 */
 template<bool H>
-unsigned char *msg_tmp(enum tin_htype type)
+unsigned char *msg_tmp(enum tgn_htype type)
 {
 	size_t size = (H) ? HEADERSIZE : FULLSIZE;
 	unsigned char *buffer, *key;
 
 	buffer = new unsigned char[size];
-	key = tinstruct::public_key;
+	key = tgnstruct::public_key;
 	size -= HASHSIZE + 1;
 
 	buffer[0] = static_cast<unsigned char>(type);
@@ -109,7 +109,7 @@ unsigned char *msg_tmp(enum tin_htype type)
 }
 
 template<bool H>
-unsigned char *msg_usr(enum tin_htype type)
+unsigned char *msg_usr(enum tgn_htype type)
 {
 	unsigned char b = U_RESPONSE_NODES;
 	b = static_cast<unsigned char>(type);
@@ -117,7 +117,7 @@ unsigned char *msg_usr(enum tin_htype type)
 	if (b % 2 == 0)
 		return nullptr;
 
-	return msg_tmp<H>(static_cast<enum tin_htype>(++b));
+	return msg_tmp<H>(static_cast<enum tgn_htype>(++b));
 }
 
 template<short S>

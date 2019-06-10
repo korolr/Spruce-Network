@@ -6,13 +6,13 @@
 
 using namespace std;
 
-using tinstruct::secret_key;
-using tinstruct::public_key;
-using tinstruct::neighbors;
+using tgnstruct::secret_key;
+using tgnstruct::public_key;
+using tgnstruct::neighbors;
 using chrono::system_clock;
-using tinstruct::nodes;
+using tgnstruct::nodes;
 using chrono::time_point;
-using tinstorage::db;
+using tgnstorage::db;
 
 void ip_converter_test(string ip)
 {
@@ -30,18 +30,18 @@ int main(int argc, char *argv[])
 	time_point<system_clock> clock;
 	vector<time_list>::iterator t;
 	vector<time_list> updnnbrs;
-	struct tin_node node;
-	struct tin_task task;
+	struct tgn_node node;
+	struct tgn_task task;
 	unsigned char *buffer;
 	string pub, sec;
 
 	pub = db.get_var("PUBLIC_KEY");
 	sec = db.get_var("SECRET_KEY");
 	/**
-	*	Getting secret and public keys.	
+	*	Gettgng secret and public keys.	
 	*/
 	if (pub.length() != hash_s || sec.length() != hash_s) {
-		tinencryption::new_keys();
+		tgnencryption::new_keys();
 
 		pub = bin2hex<HASHSIZE>(public_key);
 		sec = bin2hex<HASHSIZE>(secret_key);
@@ -54,13 +54,13 @@ int main(int argc, char *argv[])
 		secret_key = hex2bin<hash_s>(sec);
 	}
 	/**
-	*	Getting node list from db.	
+	*	Gettgng node list from db.	
 	*/
-	tinstorage::nodes.select();
+	tgnstorage::nodes.select();
 	/**
-	*	Starting threads.	
+	*	Startgng threads.	
 	*/
-	if (!tinnetwork::socket.start()) {
+	if (!tgnnetwork::socket.start()) {
 		cout << "Can't start threads.\n";
 		return 1;
 	}
@@ -68,8 +68,8 @@ int main(int argc, char *argv[])
 	*	Processing data from vectors.	
 	*/
 	while (true) {
-		updnnbrs = tinstorage::neighbors.timelist();
-		tinstorage::clients.remove();
+		updnnbrs = tgnstorage::neighbors.timelist();
+		tgnstorage::clients.remove();
 		clock = system_clock::now();
 // DNS REMOVING...
 		/**
@@ -89,12 +89,12 @@ int main(int argc, char *argv[])
 				task.length = HEADERSIZE;
 				task.target_only = true;
 
-				tinstorage::tasks.add(task);
+				tgnstorage::tasks.add(task);
 				delete[] buffer;
 			}
 		}
 		/**
-		*	Updating exists list of neighbors.
+		*	Updatgng exists list of neighbors.
 		*/
 		for (t = updnnbrs.begin(); t != updnnbrs.end(); t++) {
 			if (clock - (*t).second < 900s)
@@ -107,8 +107,8 @@ int main(int argc, char *argv[])
 				return 1;
 			}
 
-			if (!tinstorage::nodes.find_hash(node, (*t).first)) {
-				tinstorage::neighbors.clear((*t).first);
+			if (!tgnstorage::nodes.find_hash(node, (*t).first)) {
+				tgnstorage::neighbors.clear((*t).first);
 				delete[] (*t).first;
 				delete[] buffer;
 				continue;
@@ -119,7 +119,7 @@ int main(int argc, char *argv[])
 			task.length = HEADERSIZE;
 			task.target_only = true;
 
-			tinstorage::tasks.add(task);
+			tgnstorage::tasks.add(task);
 			delete[] (*t).first;
 			delete[] buffer;
 		}
@@ -142,7 +142,7 @@ int main(int argc, char *argv[])
 			task.target_only = false;
 			task.length = HEADERSIZE;
 
-			tinstorage::tasks.add(task);
+			tgnstorage::tasks.add(task);
 			delete[] buffer;
 			continue;
 		}
@@ -151,10 +151,10 @@ int main(int argc, char *argv[])
 		*/
 		for (auto &p : nodes) {
 			if (clock - p.ping > 43200s || p.remove)
-				tinstorage::nodes.remove(p.ip);
+				tgnstorage::nodes.remove(p.ip);
 		}
 	}
 
-	tinnetwork::recv.join();
+	tgnnetwork::recv.join();
 	return 0;
 }

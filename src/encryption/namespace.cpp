@@ -1,6 +1,6 @@
 /**
 *	encryption.cpp - Модуль отвечающий за работу с
-*	элементами шифрации и идетификации в сети TIN.
+*	элементами шифрации и идетификации в сети TGN.
 *
 *	@mrrva - 2019
 */
@@ -10,13 +10,13 @@
 */
 using namespace std;
 /**
-*	tinencryption::new_keys - Генерация пары ключей
+*	tgnencryption::new_keys - Генерация пары ключей
 *	шифрации.
 */
-void tinencryption::new_keys(void)
+void tgnencryption::new_keys(void)
 {
-	using tinstruct::secret_key;
-	using tinstruct::public_key;
+	using tgnstruct::secret_key;
+	using tgnstruct::public_key;
 
 	public_key = new unsigned char[HASHSIZE];
 	secret_key = new unsigned char[HASHSIZE];
@@ -24,13 +24,13 @@ void tinencryption::new_keys(void)
 	crypto_box_keypair(public_key, secret_key);
 }
 /**
-*	tinencryption::pack - Шифрация байтового массива
+*	tgnencryption::pack - Шифрация байтового массива
 *	для пересылки пользователю.
 *
 *	@text - Указатель на байтовый массив.
 *	@key - Публичный ключ пользователя.
 */
-unsigned char *tinencryption::pack(unsigned char *text,
+unsigned char *tgnencryption::pack(unsigned char *text,
 	unsigned char *key)
 {
 	unsigned char *buffer = nullptr;
@@ -38,7 +38,7 @@ unsigned char *tinencryption::pack(unsigned char *text,
 
 	if (!text || !key) {
 		cout << "Error: Incorrect args in "
-			<< "tinencryption::pack\n";
+			<< "tgnencryption::pack\n";
 		return nullptr;
 	}
 
@@ -50,22 +50,22 @@ unsigned char *tinencryption::pack(unsigned char *text,
 	return buffer;
 }
 /**
-*	tinencryption::unpack - Дешифрация байтового массива
+*	tgnencryption::unpack - Дешифрация байтового массива
 *	для дальнейшей обработки.
 *
 *	@text - Указатель на байтовый массив.
 */
-unsigned char *tinencryption::unpack(unsigned char *text)
+unsigned char *tgnencryption::unpack(unsigned char *text)
 {
-	using tinstruct::secret_key;
-	using tinstruct::public_key;
+	using tgnstruct::secret_key;
+	using tgnstruct::public_key;
 
 	unsigned char *buffer = nullptr;
 	size_t len;
 
 	if (!text) {
 		cout << "Error: Incorrect args in "
-			<< "tinencryption::unpack\n";
+			<< "tgnencryption::unpack\n";
 		return nullptr;
 	}
 
@@ -76,7 +76,7 @@ unsigned char *tinencryption::unpack(unsigned char *text)
 	if (crypto_box_seal_open(buffer, text, len
 		, public_key, secret_key) != 0) {
 		cout << "Error: crypto_box_seal_open in "
-			<< "tinencryption::unpack\n";
+			<< "tgnencryption::unpack\n";
 		return nullptr;
 	}
 

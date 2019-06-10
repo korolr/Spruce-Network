@@ -1,6 +1,6 @@
 /**
 *	neighbors.cpp - Модуль отвечающий за работу с
-*	структурой соседних клиентов сети tin.
+*	структурой соседних клиентов сети TGN.
 *
 *	@mrrva - 2019
 */
@@ -19,7 +19,7 @@ using namespace std;
 void _neighbors::add(unsigned char *node,
 	unsigned char *client) {
 
-	struct tin_neighbor neighbor;
+	struct tgn_neighbor neighbor;
 
 	if (!node || !client || this->exists(client))
 		return;
@@ -30,7 +30,7 @@ void _neighbors::add(unsigned char *node,
 	memcpy(neighbor.client, client, HASHSIZE);
 	memcpy(neighbor.node, node, HASHSIZE);
 
-	tinstruct::neighbors.push_back(neighbor);
+	tgnstruct::neighbors.push_back(neighbor);
 	this->mute.unlock();
 }
 /**
@@ -48,7 +48,7 @@ bool _neighbors::exists(unsigned char *client)
 
 	this->mute.lock();
 
-	for (auto &p : tinstruct::neighbors) {
+	for (auto &p : tgnstruct::neighbors) {
 		if (memcmp(p.client, client, HASHSIZE) == 0) {
 			status = true;
 			break;
@@ -66,9 +66,9 @@ bool _neighbors::exists(unsigned char *client)
 */
 void _neighbors::clear(unsigned char *hash)
 {
-	using tinstruct::neighbors;
+	using tgnstruct::neighbors;
 
-	vector<struct tin_neighbor>::iterator it;
+	vector<struct tgn_neighbor>::iterator it;
 
 	if (!hash || hash == nullptr)
 		return;
@@ -89,7 +89,7 @@ void _neighbors::clear(unsigned char *hash)
 *	@buff - Буфер выгрузки данных.
 *	@hash - Хэш клиента.
 */
-bool _neighbors::find(struct tin_neighbor &buff,
+bool _neighbors::find(struct tgn_neighbor &buff,
 	unsigned char *hash)
 {
 	bool status = false;
@@ -99,7 +99,7 @@ bool _neighbors::find(struct tin_neighbor &buff,
 
 	this->mute.lock();
 
-	for (auto &p : tinstruct::neighbors)
+	for (auto &p : tgnstruct::neighbors)
 		if (memcmp(hash, p.client, HASHSIZE) == 0) {
 			p.ping = chrono::system_clock::now();
 			status = true;
@@ -116,7 +116,7 @@ bool _neighbors::find(struct tin_neighbor &buff,
 */
 vector<time_list> _neighbors::timelist(void)
 {
-	using tinstruct::neighbors;
+	using tgnstruct::neighbors;
 
 	typedef time_point<system_clock> time;
 	typedef unsigned char uc;

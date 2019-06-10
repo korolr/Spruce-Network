@@ -16,15 +16,15 @@ using namespace std;
 *	@msg - Сообщение от клиента сети.
 *	@skddr - Структура sockaddr_in.
 */
-struct tin_task _router::s_find(tinmsg &msg,
+struct tgn_task _router::s_find(tgnmsg &msg,
 	struct sockaddr_in &skddr)
 {
-	using tinstorage::routes;
+	using tgnstorage::routes;
 
 	struct find_request f_req = msg.info_find();
 	unsigned char *msg_b, *info;
-	struct tin_ipport ipp;
-	struct tin_task task;
+	struct tgn_ipport ipp;
+	struct tgn_task task;
 	string target;
 
 	if (bytes_sum<HASHSIZE>(f_req.hash) == 0x00) {
@@ -69,10 +69,10 @@ struct tin_task _router::s_find(tinmsg &msg,
 *	@req - Обработанная структура поиска.
 *	@target - Откуда пришел запрос.
 */
-struct tin_task _router::send_find(unsigned char *msg,
+struct tgn_task _router::send_find(unsigned char *msg,
 	struct find_request req, string target)
 {
-	struct tin_task task;
+	struct tgn_task task;
 	unsigned char *tmp;
 
 	if (!msg || target.length() < 6
@@ -101,11 +101,11 @@ struct tin_task _router::send_find(unsigned char *msg,
 *	@skddr - Структура sockaddr_in.
 *	@req - Обработанная структура поиска.
 */
-struct tin_task _router::cycle_find(unsigned char *msg,
+struct tgn_task _router::cycle_find(unsigned char *msg,
 	struct sockaddr_in skddr, struct find_request req)
 {
-	struct tin_ipport ipport = ipport_get(skddr);
-	struct tin_task task;
+	struct tgn_ipport ipport = ipport_get(skddr);
+	struct tgn_task task;
 	unsigned char *tmp;
 
 	if (!msg || msg == nullptr) {
@@ -122,7 +122,7 @@ struct tin_task _router::cycle_find(unsigned char *msg,
 
 	memcpy(task.bytes, msg, HEADERSIZE);
 
-	if (tinstorage::clients.exists(req.hash)) {
+	if (tgnstorage::clients.exists(req.hash)) {
 		task.bytes[HASHSIZE + 1] = 0x01;
 		task.length = HEADERSIZE;
 		task.target_only = true;
@@ -131,12 +131,12 @@ struct tin_task _router::cycle_find(unsigned char *msg,
 		return task;
 	}
 
-	for (auto &p : tinstruct::nodes) {
+	for (auto &p : tgnstruct::nodes) {
 		task.client_in = saddr_get(p.ip, PORT);
 		task.length = HEADERSIZE;
 		task.target_only = true;
 
-		tinstorage::tasks.add(task);
+		tgnstorage::tasks.add(task);
 	}
 
 	task.bytes[0] = 0x00;

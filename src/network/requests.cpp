@@ -1,6 +1,6 @@
 /**
 *	requests.cpp - Модуль отвечающий за новые
-*	запросы пользователей сети TIN.
+*	запросы пользователей сети TGN.
 *
 *	@mrrva - 2019
 */
@@ -15,9 +15,9 @@ using namespace std;
 *
 *	@dt - Структура входящих параметров для потока.
 */
-void _requests::operator <<(struct tin_task dt)
+void _requests::operator <<(struct tgn_task dt)
 {
-	tinmsg msg(dt.bytes);
+	tgnmsg msg(dt.bytes);
 
 	if (msg.is_node()) {
 		thread(&_requests::thr_node, this, msg,
@@ -35,28 +35,28 @@ void _requests::operator <<(struct tin_task dt)
 *	@msg - Сообщение пользователя.
 *	@skddr - Структура подключения пользователя.
 */
-void _requests::thr_client(tinmsg msg,
+void _requests::thr_client(tgnmsg msg,
 	struct sockaddr_in skddr)
 {
 	unsigned char *resp, *hash = msg.byte_key();
-	enum tin_htype type = msg.header_type();
-	struct tin_task response;
-	struct tin_ipport ipport;
+	enum tgn_htype type = msg.header_type();
+	struct tgn_task response;
+	struct tgn_ipport ipport;
 
 	if (type == INDEFINITE_MESSAGE)
 		return;
 
 	ipport = ipport_get(skddr);
-	tinstorage::clients.update(hash, ipport);
+	tgnstorage::clients.update(hash, ipport);
 
 	if ((resp = msg_usr<true>(type)) == nullptr)
 		resp = msg_tmp<true>(U_RESPONSE_DOS);
 
 	this->socket_response(resp, skddr);
-	response = tinrouter::client(msg, skddr);
+	response = tgnrouter::client(msg, skddr);
 
 	if (response.bytes[0] != 0x00)
-		tinstorage::tasks.add(response);
+		tgnstorage::tasks.add(response);
 
 	if (hash != nullptr)
 		delete[] hash;
@@ -69,14 +69,14 @@ void _requests::thr_client(tinmsg msg,
 *	@msg - Сообщение пользователя.
 *	@skddr - Структура подключения пользователя.
 */
-void _requests::thr_node(tinmsg msg,
+void _requests::thr_node(tgnmsg msg,
 	struct sockaddr_in skddr)
 {
-	struct tin_ipport ipport = ipport_get(skddr);
-	enum tin_htype type = msg.header_type();
-	struct tin_task response;
+	struct tgn_ipport ipport = ipport_get(skddr);
+	enum tgn_htype type = msg.header_type();
+	struct tgn_task response;
 	unsigned char *resp, *hash;
-	struct tin_node node;
+	struct tgn_node node;
 
 	if (type == INDEFINITE_MESSAGE
 		|| ipport.port != PORT)
@@ -86,10 +86,10 @@ void _requests::thr_node(tinmsg msg,
 		resp = msg_tmp<true>(S_RESPONSE_DOS);
 
 	this->socket_response(resp, skddr);
-	response = tinrouter::node(msg, skddr);
+	response = tgnrouter::node(msg, skddr);
 
 	if (response.bytes[0] != 0x00)
-		tinstorage::tasks.add(response);
+		tgnstorage::tasks.add(response);
 
 	if ((hash = msg.byte_key()) == nullptr) {
 		delete[] resp;
@@ -99,7 +99,7 @@ void _requests::thr_node(tinmsg msg,
 	memcpy(node.hash, hash, HASHSIZE);
 	node.ip = ipport.ip;
 
-	tinstorage::nodes.add(node);
+	tgnstorage::nodes.add(node);
 	delete[] resp;
 	delete[] hash;
 }
@@ -113,7 +113,7 @@ void _requests::thr_node(tinmsg msg,
 void _requests::socket_response(unsigned char *buffer,
 	struct sockaddr_in &sin)
 {
-	using tinnetwork::sok;
+	using tgnnetwork::sok;
 
 	size_t sz = sizeof(struct sockaddr_in);
 	struct sockaddr *saddr;

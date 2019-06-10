@@ -16,12 +16,12 @@ using namespace std;
 *	@msg - Сообщение от клиента сети.
 *	@skddr - Структура sockaddr_in.
 */
-struct tin_task _router::u_garlic(tinmsg &msg,
+struct tgn_task _router::u_garlic(tgnmsg &msg,
 	struct sockaddr_in &skddr)
 {
 	pair<unsigned char *, unsigned char *> req;
-	struct tin_route route;
-	struct tin_task task;
+	struct tgn_route route;
+	struct tgn_task task;
 	unsigned char *hash;
 
 	req = msg.info_garlic();
@@ -34,12 +34,12 @@ struct tin_task _router::u_garlic(tinmsg &msg,
 		goto exit_u_garlic;
 	}
 
-	if (tinstorage::routes.exists(req.first) != 1) {
+	if (tgnstorage::routes.exists(req.first) != 1) {
 		this->from_neighbors(req.first);
 		this->from_clients(req.first);
 	}
 
-	if (tinstorage::routes.find(route, req.first)) {
+	if (tgnstorage::routes.find(route, req.first)) {
 		task = this->send_message(route.ipport, msg);
 		goto exit_u_garlic;
 	}
@@ -65,8 +65,8 @@ exit_u_garlic:
 */
 void _router::make_find(unsigned char *hash)
 {
-	struct tin_task task;
-	struct tin_ipport ip;
+	struct tgn_task task;
+	struct tgn_ipport ip;
 	unsigned char *msg_b;
 
 	if (!hash || hash == nullptr)
@@ -78,14 +78,14 @@ void _router::make_find(unsigned char *hash)
 	memcpy(msg_b + HASHSIZE + 2, hash, HASHSIZE);
 	memcpy(task.bytes, msg_b, HEADERSIZE);
 
-	tinstorage::routes.add(hash, ip, true);
+	tgnstorage::routes.add(hash, ip, true);
 
-	for (auto &p : tinstruct::nodes) {
+	for (auto &p : tgnstruct::nodes) {
 		task.client_in = saddr_get(p.ip, PORT);
 		task.length = HEADERSIZE;
 		task.target_only = true;
 
-		tinstorage::tasks.add(task);
+		tgnstorage::tasks.add(task);
 	}
 
 	delete[] msg_b;
@@ -97,11 +97,11 @@ void _router::make_find(unsigned char *hash)
 *	@ipp - Структура данных ip & port.
 *	@msg - Структура сообщения.
 */
-struct tin_task _router::send_message(struct tin_ipport ipp,
-	tinmsg &msg)
+struct tgn_task _router::send_message(struct tgn_ipport ipp,
+	tgnmsg &msg)
 {
 	unsigned char *txt, *msg_b;
-	struct tin_task task;
+	struct tgn_task task;
 
 	task.client_in = saddr_get(ipp.ip, ipp.port);
 	task.target_only = true;
@@ -125,19 +125,19 @@ struct tin_task _router::send_message(struct tin_ipport ipp,
 */
 void _router::from_neighbors(unsigned char *hash)
 {
-	using tinstorage::neighbors;
-	using tinstorage::nodes;
+	using tgnstorage::neighbors;
+	using tgnstorage::nodes;
 
-	struct tin_neighbor neighbor;
-	struct tin_ipport ipport;
-	struct tin_node node;
+	struct tgn_neighbor neighbor;
+	struct tgn_ipport ipport;
+	struct tgn_node node;
 
 	if (!hash || !neighbors.find(neighbor, hash)
 		|| !nodes.find_hash(node, neighbor.node))
 		return;
 
 	ipport = {node.ip, PORT};
-	tinstorage::routes.add(hash, ipport, false);
+	tgnstorage::routes.add(hash, ipport, false);
 }
 /**
 *	_router::from_clients - Определение целели для
@@ -147,10 +147,10 @@ void _router::from_neighbors(unsigned char *hash)
 */
 void _router::from_clients(unsigned char *hash)
 {
-	using tinstorage::clients;
-	using tinstorage::routes;
+	using tgnstorage::clients;
+	using tgnstorage::routes;
 
-	struct tin_client client;
+	struct tgn_client client;
 
 	if (!hash || !clients.find(client, hash))
 		return;
@@ -164,12 +164,12 @@ void _router::from_clients(unsigned char *hash)
 *	@msg - Сообщение от клиента сети.
 *	@skddr - Структура sockaddr_in.
 */
-struct tin_task _router::s_garlic(tinmsg &msg,
+struct tgn_task _router::s_garlic(tgnmsg &msg,
 	struct sockaddr_in &skddr)
 {
 	pair<unsigned char *, unsigned char *> req;
-	struct tin_client client;
-	struct tin_task task;
+	struct tgn_client client;
+	struct tgn_task task;
 
 	req = msg.info_garlic();
 
@@ -178,7 +178,7 @@ struct tin_task _router::s_garlic(tinmsg &msg,
 		return task;
 	}
 
-	if (tinstorage::clients.find(client, req.first)) {
+	if (tgnstorage::clients.find(client, req.first)) {
 		task = this->send_message(client.ipport, msg);
 	}
 

@@ -1,16 +1,16 @@
 /**
 *	network.hpp - Заголовочный файл децентрализованной
-*	сети TIN. Здесь опублекованны все константы,
+*	сети TGN. Здесь опублекованны все константы,
 *	прототипы, классы и структуры модуля network.
 *
 *	@mrrva - 2019
 */
-#ifndef TIN_NETWORK
-#define TIN_NETWORK
+#ifndef TGN_NETWORK
+#define TGN_NETWORK
 /**
 *	Заголовочные файлы других модулей.
 */
-#include "tin.hpp"
+#include "tgn.hpp"
 #include "storage.hpp"
 #include "struct.hpp"
 #include "router.hpp"
@@ -30,7 +30,7 @@ class _socket {
 		struct timeval timeout;
 		bool stop;
 
-		void send_task(struct tin_task &);
+		void send_task(struct tgn_task &);
 		void thread_recv(void);
 		void thread_send(void);
 		void set_opts(int &);
@@ -46,19 +46,19 @@ class _requests {
 		std::mutex tasks_mutex;
 
 		void socket_response(unsigned char *, struct sockaddr_in &);
-		void thr_client(tinmsg, struct sockaddr_in);
-		void thr_node(tinmsg, struct sockaddr_in);
-		void response_thr(struct tin_task);
+		void thr_client(tgnmsg, struct sockaddr_in);
+		void thr_node(tgnmsg, struct sockaddr_in);
+		void response_thr(struct tgn_task);
 
 	public :
-		void operator <<(struct tin_task);
+		void operator <<(struct tgn_task);
 };
 /**
 *	Вспомогательные шаблоны и функции модуля.
 */
-inline struct tin_ipport ipport_get(struct sockaddr_in a)
+inline struct tgn_ipport ipport_get(struct sockaddr_in a)
 {
-	struct tin_ipport ipport;
+	struct tgn_ipport ipport;
 	char temp[21];
 
 	inet_ntop(AF_INET, &a.sin_addr, temp, 20);
@@ -80,7 +80,7 @@ inline struct sockaddr_in saddr_get(std::string ip, short p)
 	return sockaddr;
 }
 /**
-*	tinnetwork - Пространство имен модуля network. C помощью
+*	tgnnetwork - Пространство имен модуля network. C помощью
 *	него происходит управление модулем network.
 *
 *	@send - Объект управления потоком отправки сообщений.
@@ -89,7 +89,7 @@ inline struct sockaddr_in saddr_get(std::string ip, short p)
 *	@socket - Объект управления сокетом.
 *	@sok - Сокет приема/передачи данных.
 */
-namespace tinnetwork {
+namespace tgnnetwork {
 	inline std::thread send, recv;
 	inline _requests requests;
 	inline _socket socket;

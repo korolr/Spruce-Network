@@ -1,16 +1,16 @@
 /**
 *	struct.hpp - Заголовочный файл децентрализованной
-*	сети TIN. Здесь опублекованны все главные объекты,
+*	сети TGN. Здесь опублекованны все главные объекты,
 *	структуры и пространство имен с общими данными.
 *
 *	@mrrva - 2019
 */
-#ifndef TIN_STRUCT
-#define TIN_STRUCT
+#ifndef TGN_STRUCT
+#define TGN_STRUCT
 /**
 *	Главный заголовочный файл проекта.
 */
-#include "tin.hpp"
+#include "tgn.hpp"
 /**
 *	Используемые пространства имен.
 */
@@ -19,45 +19,45 @@ using std::chrono::time_point;
 /**
 *	Доступные структуры.
 */
-struct tin_ipport {
+struct tgn_ipport {
 	std::string ip;
 	size_t port;
 };
 
-struct tin_client {
+struct tgn_client {
 	unsigned char hash[HASHSIZE];
-	struct tin_ipport ipport;
+	struct tgn_ipport ipport;
 	time_point<system_clock> ping;
 };
 
-struct tin_node {
+struct tgn_node {
 	unsigned char hash[HASHSIZE];
 	time_point<system_clock> ping;
 	std::string ip;
 	bool remove;
 };
 
-struct tin_neighbor {
+struct tgn_neighbor {
 	unsigned char client[HASHSIZE];
 	unsigned char node[HASHSIZE];
 	time_point<system_clock> ping;
 };
 
-struct tin_route {
+struct tgn_route {
 	unsigned char hash[HASHSIZE];
 	time_point<system_clock> ping;
-	struct tin_ipport ipport;
+	struct tgn_ipport ipport;
 	bool find;
 };
 
-struct tin_task {
+struct tgn_task {
 	unsigned char bytes[FULLSIZE];
 	struct sockaddr_in client_in;
 	bool target_only;
 	short length;
 };
 /**
-*	tinstruct - Пространство имен общих объектов. C помощью
+*	tgnstruct - Пространство имен общих объектов. C помощью
 *	него происходит передача данных между модулями.
 *
 *	@neighbors - Список клиентов у знакомых нод.
@@ -68,12 +68,12 @@ struct tin_task {
 *	@public_key - Публичный ключ ноды.
 *	@secret_key - Секретный ключ ноды.
 */
-namespace tinstruct {
-	inline std::vector<struct tin_neighbor>	neighbors;
-	inline std::vector<struct tin_client>	clients;
-	inline std::vector<struct tin_route>	routes;
-	inline std::vector<struct tin_node>		nodes;
-	inline std::vector<struct tin_task>		tasks;
+namespace tgnstruct {
+	inline std::vector<struct tgn_neighbor>	neighbors;
+	inline std::vector<struct tgn_client>	clients;
+	inline std::vector<struct tgn_route>	routes;
+	inline std::vector<struct tgn_node>		nodes;
+	inline std::vector<struct tgn_task>		tasks;
 	inline unsigned char *public_key;
 	inline unsigned char *secret_key;
 }

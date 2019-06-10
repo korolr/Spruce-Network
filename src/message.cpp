@@ -1,6 +1,6 @@
 /**
 *	message.cpp - Модуль отвечающий за объекты
-*	сообщений децентрализованной сети tin.
+*	сообщений децентрализованной сети TGN.
 *
 *	@mrrva - 2019
 */
@@ -10,12 +10,12 @@
 */
 using namespace std;
 /**
-*	tinmsg::tinmsg - Конструктор класса tinmsg.
+*	tgnmsg::tgnmsg - Конструктор класса tgnmsg.
 *	Заполняет переменные и указатели.
 *
 *	@bytes - Байтовый массив.
 */
-tinmsg::tinmsg(unsigned char *bytes)
+tgnmsg::tgnmsg(unsigned char *bytes)
 {
 	this->bytes[0] = 0x00;
 
@@ -27,10 +27,10 @@ tinmsg::tinmsg(unsigned char *bytes)
 	memcpy(this->bytes, bytes, this->length);
 }
 /**
-*	tinmsg::is_header_only - Является ли сообщение
+*	tgnmsg::is_header_only - Является ли сообщение
 *	системным.
 */
-bool tinmsg::is_header_only(void)
+bool tgnmsg::is_header_only(void)
 {
 	if (this->bytes[0] == 0x00)
 		return false;
@@ -40,12 +40,12 @@ bool tinmsg::is_header_only(void)
 	return false;
 }
 /**
-*	tinmsg::to_bytes - Возвращает сообщение в байтовом
+*	tgnmsg::to_bytes - Возвращает сообщение в байтовом
 *	формате.
 *
 *	@len - Количество байт.
 */
-unsigned char *tinmsg::to_bytes(size_t &len)
+unsigned char *tgnmsg::to_bytes(size_t &len)
 {
 	unsigned char *temp;
 
@@ -59,10 +59,10 @@ unsigned char *tinmsg::to_bytes(size_t &len)
 	return temp;
 }
 /**
-*	tinmsg::str_key - Перводит публичный ключ пользователя
+*	tgnmsg::str_key - Перводит публичный ключ пользователя
 *	в байтовый формат.
 */
-string tinmsg::str_key(void)
+string tgnmsg::str_key(void)
 {
 	unsigned char *bytes;
 	string pub_key;
@@ -78,10 +78,10 @@ string tinmsg::str_key(void)
 	return pub_key;
 }
 /**
-*	tinmsg::get_info - Возвращает байтовый массив
+*	tgnmsg::get_info - Возвращает байтовый массив
 *	дополнительной информации сообщения.
 */
-unsigned char *tinmsg::get_info(void)
+unsigned char *tgnmsg::get_info(void)
 {
 	size_t move = 1 + HASHSIZE;
 	unsigned char *temp;
@@ -94,10 +94,10 @@ unsigned char *tinmsg::get_info(void)
 	return temp;
 }
 /**
-*	tinmsg::get_info - Возвращает публичный ключ
+*	tgnmsg::get_info - Возвращает публичный ключ
 *	в байтовом формате.
 */
-unsigned char *tinmsg::byte_key(void)
+unsigned char *tgnmsg::byte_key(void)
 {
 	unsigned char *temp;
 
@@ -110,35 +110,35 @@ unsigned char *tinmsg::byte_key(void)
 	return temp;
 }
 /**
-*	tinmsg::is_node - Является ли сообщение от
+*	tgnmsg::is_node - Является ли сообщение от
 *	ноды.
 */
-bool tinmsg::is_node(void)
+bool tgnmsg::is_node(void)
 {
 	if (this->bytes[0] >= 0x10)
 		return true;
 	return false;
 }
 /**
-*	tinmsg::header_type - Возвращает тип сообщения.
+*	tgnmsg::header_type - Возвращает тип сообщения.
 */
-enum tin_htype tinmsg::header_type(void)
+enum tgn_htype tgnmsg::header_type(void)
 {
-	enum tin_htype type = INDEFINITE_MESSAGE;
+	enum tgn_htype type = INDEFINITE_MESSAGE;
 	unsigned char b = this->bytes[0];
 
 	if ((b > 0x00 && b <= 0x06) || (b > 0x10
 		&& b <= 0x1d))
-		type = static_cast<enum tin_htype>(b);
+		type = static_cast<enum tgn_htype>(b);
 	return type;
 }
 /**
-*	tinmsg::length_detect - Функция автоматического
+*	tgnmsg::length_detect - Функция автоматического
 *	вычисления длины сообщения.
 *
 *	@buffer - Байтовый массив.
 */
-size_t tinmsg::length_detect(unsigned char *buffer)
+size_t tgnmsg::length_detect(unsigned char *buffer)
 {
 	if (buffer[0] == 0x05 || buffer[0] == 0x06
 		|| buffer[0] >= 0x17)
@@ -146,11 +146,11 @@ size_t tinmsg::length_detect(unsigned char *buffer)
 	return HASHSIZE;
 }
 /**
-*	tinmsg::operator = - Оператор присвоения объекта.
+*	tgnmsg::operator = - Оператор присвоения объекта.
 *
 *	@from - Входящий параметр оператора.
 */
-void tinmsg::operator =(tinmsg &from)
+void tgnmsg::operator =(tgnmsg &from)
 {
 	unsigned char *bytes;
 	size_t len;
@@ -166,10 +166,10 @@ void tinmsg::operator =(tinmsg &from)
 	delete[] bytes;
 }
 /**
-*	tinmsg::info_nodes - Функция считывания данных
+*	tgnmsg::info_nodes - Функция считывания данных
 *	из блока сообщения.
 */
-unsigned char *tinmsg::garlic_msg(void)
+unsigned char *tgnmsg::garlic_msg(void)
 {
 	unsigned char *temp;
 
@@ -183,10 +183,10 @@ unsigned char *tinmsg::garlic_msg(void)
 	return temp;
 }
 /**
-*	tinmsg::info_nodes - Функция считывания данных
+*	tgnmsg::info_nodes - Функция считывания данных
 *	из блока инфорсвции.
 */
-unsigned char *tinmsg::info_msg(void)
+unsigned char *tgnmsg::info_msg(void)
 {
 	unsigned char *temp;
 
@@ -199,10 +199,10 @@ unsigned char *tinmsg::info_msg(void)
 	return temp;
 }
 /**
-*	tinmsg::info_nodes - Функция считывания данных
+*	tgnmsg::info_nodes - Функция считывания данных
 *	нод в блоке информации сообщения.
 */
-map<unsigned char *, string> tinmsg::info_nodes(void)
+map<unsigned char *, string> tgnmsg::info_nodes(void)
 {
 	unsigned char *s_ptr = this->bytes + HASHSIZE + 1;
 	size_t parts = INFOSIZE / (HASHSIZE + 4);
@@ -234,10 +234,10 @@ map<unsigned char *, string> tinmsg::info_nodes(void)
 	return data;
 }
 /**
-*	tinmsg::info_neighbors - Функция считывания данных
+*	tgnmsg::info_neighbors - Функция считывания данных
 *	соседей в блоке информации сообщения.
 */
-vector<unsigned char *> tinmsg::info_neighbors(void)
+vector<unsigned char *> tgnmsg::info_neighbors(void)
 {
 	unsigned char *s_ptr = this->bytes + HASHSIZE + 1;
 	size_t parts = INFOSIZE / HASHSIZE;
@@ -263,10 +263,10 @@ vector<unsigned char *> tinmsg::info_neighbors(void)
 	return buffer;
 }
 /**
-*	tinmsg::info_find - Функция считывания данных
+*	tgnmsg::info_find - Функция считывания данных
 *	поиска клиента в блоке информации сообщения.
 */
-struct find_request tinmsg::info_find(void)
+struct find_request tgnmsg::info_find(void)
 {
 	unsigned char *s_ptr = this->bytes + HASHSIZE + 1;
 	struct find_request buffer;
@@ -283,10 +283,10 @@ struct find_request tinmsg::info_find(void)
 	return buffer;
 }
 /**
-*	tinmsg::info_garlic - Функция считывания данных
+*	tgnmsg::info_garlic - Функция считывания данных
 *	чесночной маршрутизации.
 */
-pair<unsigned char *, unsigned char *> tinmsg::info_garlic(void)
+pair<unsigned char *, unsigned char *> tgnmsg::info_garlic(void)
 {
 	typedef pair<unsigned char *, unsigned char *> pr;
 	unsigned char *s_ptr = this->bytes + HASHSIZE + 1;

@@ -1,6 +1,6 @@
 /**
 *	namespace.cpp - Модуль отвечающий за работу
-*	функций пространства имен tinrouter.
+*	функций пространства имен tgnrouter.
 *
 *	@mrrva - 2019
 */
@@ -10,17 +10,17 @@
 */
 using namespace std;
 /**
-*	tinrouter::client - Функция обработки сообщений
+*	tgnrouter::client - Функция обработки сообщений
 *	от клиентов сети.
 *
 *	@msg - Сообщение от клиента сети.
 *	@skddr - Структура sockaddr_in.
 */
-struct tin_task tinrouter::client(tinmsg msg,
+struct tgn_task tgnrouter::client(tgnmsg msg,
 		struct sockaddr_in skddr)
 {
-	enum tin_htype type = msg.header_type();
-	struct tin_task task;
+	enum tgn_htype type = msg.header_type();
+	struct tgn_task task;
 
 	if (type == INDEFINITE_MESSAGE || type >= 0x10
 		|| type == U_REQUEST_DOS) {
@@ -45,17 +45,17 @@ struct tin_task tinrouter::client(tinmsg msg,
 	return task;
 }
 /**
-*	tinrouter::node - Функция обработки сообщений
+*	tgnrouter::node - Функция обработки сообщений
 *	от нод сети.
 *
 *	@msg - Сообщение от ноды сети.
 *	@skddr - Структура sockaddr_in.
 */
-struct tin_task tinrouter::node(tinmsg msg,
+struct tgn_task tgnrouter::node(tgnmsg msg,
 	struct sockaddr_in skddr)
 {
-	enum tin_htype type = msg.header_type();
-	struct tin_task task;
+	enum tgn_htype type = msg.header_type();
+	struct tgn_task task;
 
 	if (type == INDEFINITE_MESSAGE || type <= 0x10
 		|| type == S_REQUEST_DOS) {
@@ -63,7 +63,7 @@ struct tin_task tinrouter::node(tinmsg msg,
 		return task;
 	}
 
-	tinstorage::nodes.ping(skddr);
+	tgnstorage::nodes.ping(skddr);
 
 	switch (type) {
 		case S_REQUEST_NODES:

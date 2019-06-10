@@ -1,6 +1,6 @@
 /**
 *	tasks.cpp - Модуль отвечающий за работу с
-*	структурой заданий сети tin.
+*	структурой заданий сети TGN.
 *
 *	@mrrva - 2019
 */
@@ -15,11 +15,11 @@ using namespace std;
 *
 *	@i - Итератор задания.
 */
-void _tasks::remove(vector<struct tin_task>::iterator i)
+void _tasks::remove(vector<struct tgn_task>::iterator i)
 {
-	using tinstruct::tasks;
+	using tgnstruct::tasks;
 
-	vector<struct tin_task>::iterator p;
+	vector<struct tgn_task>::iterator p;
 
 	if (tasks.empty())
 		return;
@@ -41,9 +41,9 @@ void _tasks::remove(vector<struct tin_task>::iterator i)
 *
 *	@task - Структура нового задания.
 */
-void _tasks::add(struct tin_task task)
+void _tasks::add(struct tgn_task task)
 {
 	this->mute.lock();
-	tinstruct::tasks.push_back(task);
+	tgnstruct::tasks.push_back(task);
 	this->mute.unlock();
 }

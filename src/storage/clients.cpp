@@ -1,6 +1,6 @@
 /**
 *	nodes.cpp - Модуль отвечающий за работу с
-*	структурой клиентов сети tin.
+*	структурой клиентов сети TGN.
 *
 *	@mrrva - 2019
 */
@@ -17,13 +17,13 @@ using namespace std;
 *	@ipport - Структура ipport.
 */
 void _clients::update(unsigned char *hash,
-	struct tin_ipport &ipport)
+	struct tgn_ipport &ipport)
 {
-	struct tin_client new_one;
+	struct tgn_client new_one;
 
 	this->mute.lock();
 
-	for (auto &p : tinstruct::clients)
+	for (auto &p : tgnstruct::clients)
 		if (p.ipport.ip == ipport.ip) {
 			p.ping = chrono::system_clock::now();
 			memcpy(p.hash, hash, HASHSIZE);
@@ -35,7 +35,7 @@ void _clients::update(unsigned char *hash,
 	memcpy(new_one.hash, hash, HASHSIZE);
 	new_one.ipport = ipport;
 
-	tinstruct::clients.push_back(new_one);
+	tgnstruct::clients.push_back(new_one);
 	this->mute.unlock();
 }
 /**
@@ -44,7 +44,7 @@ void _clients::update(unsigned char *hash,
 */
 void _clients::remove(void)
 {
-	using tinstruct::clients;
+	using tgnstruct::clients;
 
 	time_point<system_clock> time_now;
 
@@ -74,7 +74,7 @@ bool _clients::exists(unsigned char *hash)
 
 	this->mute.lock();
 
-	for (auto &p : tinstruct::clients)
+	for (auto &p : tgnstruct::clients)
 		if (memcmp(hash, p.hash, HASHSIZE) == 0) {
 			status = true;
 			break;
@@ -90,7 +90,7 @@ bool _clients::exists(unsigned char *hash)
 *	@buffer - Структура записи клиента.
 *	@hash - Хэш клиента.
 */
-bool _clients::find(struct tin_client &buffer,
+bool _clients::find(struct tgn_client &buffer,
 	unsigned char *hash)
 {
 	bool status = false;
@@ -100,7 +100,7 @@ bool _clients::find(struct tin_client &buffer,
 
 	this->mute.lock();
 
-	for (auto &p : tinstruct::clients)
+	for (auto &p : tgnstruct::clients)
 		if (memcmp(hash, p.hash, HASHSIZE) == 0) {
 			status = true;
 			buffer = p;

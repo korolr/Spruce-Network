@@ -1,6 +1,6 @@
 /**
 *	routes.cpp - Модуль отвечающий за работу с
-*	структурой DNS записей сети tin.
+*	структурой DNS записей сети TGN.
 *
 *	@mrrva - 2019
 */
@@ -18,9 +18,9 @@ using namespace std;
 *	@find - Ищем ли мы участника маршрута.
 */
 void _routes::add(unsigned char *hash,
-	struct tin_ipport ipport, bool find)
+	struct tgn_ipport ipport, bool find)
 {
-	struct tin_route record;
+	struct tgn_route record;
 
 	if (!hash || this->exists(hash) > 0)
 		return;
@@ -31,7 +31,7 @@ void _routes::add(unsigned char *hash,
 	record.find = find;
 
 	this->mute.lock();
-	tinstruct::routes.push_back(record);
+	tgnstruct::routes.push_back(record);
 	this->mute.unlock();
 }
 /**
@@ -49,7 +49,7 @@ size_t _routes::exists(unsigned char *hash)
 
 	this->mute.lock();
 
-	for (auto &p : tinstruct::routes)
+	for (auto &p : tgnstruct::routes)
 		if (memcmp(hash, p.hash, HASHSIZE) == 0) {
 			status = (!p.find) ? 2 : 1;
 			break;
@@ -66,9 +66,9 @@ void _routes::remove(void)
 {
 	using chrono::system_clock;
 	using chrono::time_point;
-	using tinstruct::routes;
+	using tgnstruct::routes;
 
-	vector<struct tin_route>::iterator it;
+	vector<struct tgn_route>::iterator it;
 	time_point<system_clock> time_now;
 
 	if (routes.empty())
@@ -92,9 +92,9 @@ void _routes::remove(void)
 */
 void _routes::remove_hash(unsigned char *hash)
 {
-	using tinstruct::routes;
+	using tgnstruct::routes;
 
-	vector<struct tin_route>::iterator it;
+	vector<struct tgn_route>::iterator it;
 
 	if (!hash || hash == nullptr)
 		return;
@@ -116,7 +116,7 @@ void _routes::remove_hash(unsigned char *hash)
 *	@route - Структура с результатом поиска.
 *	@hash - Хэш клиента.
 */
-bool _routes::find(struct tin_route &route,
+bool _routes::find(struct tgn_route &route,
 	unsigned char *hash)
 {
 	bool status = false;
@@ -126,7 +126,7 @@ bool _routes::find(struct tin_route &route,
 
 	this->mute.lock();
 
-	for (auto &p : tinstruct::routes) {
+	for (auto &p : tgnstruct::routes) {
 		if (memcmp(hash, p.hash, HASHSIZE) == 0) {
 			p.ping = chrono::system_clock::now();
 			status = true;
@@ -146,7 +146,7 @@ bool _routes::find(struct tin_route &route,
 *	@ipport - Новая структура данных ipport.
 */
 void _routes::update(unsigned char *hash,
-	struct tin_ipport ipport)
+	struct tgn_ipport ipport)
 {
 	if (!hash || ipport.ip.length() < 6
 		|| ipport.port == 0)
@@ -154,7 +154,7 @@ void _routes::update(unsigned char *hash,
 
 	this->mute.lock();
 
-	for (auto &p : tinstruct::routes)
+	for (auto &p : tgnstruct::routes)
 		if (memcmp(hash, p.hash, HASHSIZE) == 0) {
 			p.ping = chrono::system_clock::now();
 			p.ipport = ipport;

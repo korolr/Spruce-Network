@@ -1,16 +1,16 @@
 /**
 *	storage.hpp - Заголовочный файл децентрализованной
-*	сети TIN. Здесь опублекованны все константы,
+*	сети TGN. Здесь опублекованны все константы,
 *	прототипы, классы и структуры модуля storage.
 *
 *	@mrrva - 2019
 */
-#ifndef TIN_STORAGE
-#define TIN_STORAGE
+#ifndef TGN_STORAGE
+#define TGN_STORAGE
 /**
 *	Заголовочные файлы других модулей.
 */
-#include "tin.hpp"
+#include "tgn.hpp"
 #include "struct.hpp"
 #include "network.hpp"
 
@@ -36,7 +36,7 @@ class _database {
 		void new_node(std::string, std::string);
 		void set_var(std::string, std::string);
 		void delete_node(unsigned char *);
-		void set_node(struct tin_node);
+		void set_node(struct tgn_node);
 		std::string get_var(std::string);
 		void remove_node(std::string);
 		void remove_var(std::string);
@@ -50,11 +50,11 @@ class _nodes {
 		std::mutex mute;
 
 	public :
-		bool find_hash(struct tin_node &, unsigned char *);
-		bool find_ip(struct tin_node &, std::string);
-		struct tin_node get_last(void);
+		bool find_hash(struct tgn_node &, unsigned char *);
+		bool find_ip(struct tgn_node &, std::string);
+		struct tgn_node get_last(void);
 		void ping(struct sockaddr_in &);
-		bool add(struct tin_node);
+		bool add(struct tgn_node);
 		void remove(std::string);
 		void select(void);
 };
@@ -64,8 +64,8 @@ class _clients {
 		std::mutex mute;
 
 	public :
-		void update(unsigned char *, struct tin_ipport &);
-		bool find(struct tin_client &, unsigned char *);
+		void update(unsigned char *, struct tgn_ipport &);
+		bool find(struct tgn_client &, unsigned char *);
 		bool exists(unsigned char *);
 		void remove(void);
 };
@@ -75,8 +75,8 @@ class _tasks {
 		std::mutex mute;
 
 	public :
-		void remove(std::vector<struct tin_task>::iterator);
-		void add(struct tin_task);
+		void remove(std::vector<struct tgn_task>::iterator);
+		void add(struct tgn_task);
 };
 
 class _neighbors {
@@ -84,7 +84,7 @@ class _neighbors {
 		std::mutex mute;
 
 	public :
-		bool find(struct tin_neighbor &, unsigned char *);
+		bool find(struct tgn_neighbor &, unsigned char *);
 		void add(unsigned char *, unsigned char *);
 		std::vector<time_list> timelist(void);
 		bool exists(unsigned char *);
@@ -96,16 +96,16 @@ class _routes {
 		std::mutex mute;
 
 	public :
-		void add(unsigned char *, struct tin_ipport, bool find = true);
-		void update(unsigned char *, struct tin_ipport);
-		bool find(struct tin_route &, unsigned char *);
+		void add(unsigned char *, struct tgn_ipport, bool find = true);
+		void update(unsigned char *, struct tgn_ipport);
+		bool find(struct tgn_route &, unsigned char *);
 		void add(unsigned char *, std::string);
 		void remove_hash(unsigned char *);
 		size_t exists(unsigned char *);
 		void remove(void);
 };
 /**
-*	tinstorage - Пространство имен модуля storage. C помощью
+*	tgnstorage - Пространство имен модуля storage. C помощью
 *	него происходит управление модулем storage.
 *
 *	@neighbors - Объект управления структуры соседных клиентов.
@@ -115,7 +115,7 @@ class _routes {
 *	@clients - Объект управления структуры нод.
 *	@tasks - Объект управления заданиями.
 */
-namespace tinstorage {
+namespace tgnstorage {
 	inline _neighbors	neighbors;
 	inline _clients		clients;
 	inline _routes		routes;

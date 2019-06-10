@@ -1,7 +1,7 @@
 /**
 *	database.cpp - Модуль отвечающий за работу
 *	с базой данных в децентрализованной сети
-*	tin.
+*	TGN.
 *
 *	@mrrva - 2019
 */
@@ -16,7 +16,7 @@ using namespace std;
 */
 _database::_database(void)
 {
-	string path = "./tin.db";
+	string path = "./tgn.db";
 	db = nullptr;
 
 	if (sqlite3_open(path.c_str(), &db) != SQLITE_OK) {
@@ -55,7 +55,7 @@ void _database::set_var(string name, string value)
 
 	this->var_mutex.lock();
 
-	q = "INSERT INTO settings VALUES('" + name + "', '" +
+	q = "INSERT INTO settgngs VALUES('" + name + "', '" +
 		value + "')";
 	sqlite3_prepare_v2(this->db, q.c_str(), -1, &rs, NULL);
 
@@ -89,7 +89,7 @@ string _database::get_var(string name)
 
 	this->var_mutex.lock();
 
-	q = "SELECT `value` FROM `settings` WHERE `name`='" +
+	q = "SELECT `value` FROM `settgngs` WHERE `name`='" +
 		name + "'";
 	sqlite3_prepare_v2(this->db, q.c_str(), -1, &rs, NULL);
 
@@ -133,7 +133,7 @@ void _database::remove_var(string name)
 
 	this->var_mutex.lock();
 
-	q = "DELETE FROM `settings` WHERE `name`='" +
+	q = "DELETE FROM `settgngs` WHERE `name`='" +
 		name + "'";
 
 	sqlite3_prepare_v2(this->db, q.c_str(), -1, &rs, NULL);
@@ -305,7 +305,7 @@ void _database::create_tables(void)
 		"`use_t` int(15) NOT NULL);",
 
 		"CREATE TABLE IF NOT EXISTS    " \
-		"`settings` (`name` text NOT   " \
+		"`settgngs` (`name` text NOT   " \
 		"NULL, `value` text NOT NULL);"
 	};
 	sqlite3_stmt *rs = nullptr;

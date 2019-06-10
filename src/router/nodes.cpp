@@ -17,13 +17,13 @@ using namespace std;
 *	@skddr - Структура sockaddr_in.
 *	@is_client - Сообщение от клиента.
 */
-struct tin_task _router::su_nodes(tinmsg &msg,
+struct tgn_task _router::su_nodes(tgnmsg &msg,
 	struct sockaddr_in &skddr, bool is_client)
 {
 	map<unsigned char *, string> list;
 	unsigned char *buffer;
-	enum tin_htype htype;
-	struct tin_task task;
+	enum tgn_htype htype;
+	struct tgn_task task;
 
 	htype = (is_client) ? U_REQUEST_NODES : S_REQUEST_NODES;
 	list = msg.info_nodes();
@@ -55,12 +55,12 @@ struct tin_task _router::su_nodes(tinmsg &msg,
 */
 void _router::insert_nodes(map<unsigned char *, string> list)
 {
-	struct tin_node node;
+	struct tgn_node node;
 
 	for (auto &p : list) {
 		node.ip = p.second;
 		memcpy(node.hash, p.first, HASHSIZE);
-		tinstorage::nodes.add(node);
+		tgnstorage::nodes.add(node);
 
 		delete[] p.first;
 	}
@@ -71,7 +71,7 @@ void _router::insert_nodes(map<unsigned char *, string> list)
 *
 *	@tp - Тип сообщения.
 */
-unsigned char *_router::list_nodes(enum tin_htype tp)
+unsigned char *_router::list_nodes(enum tgn_htype tp)
 {
 	unsigned char *buff, *ip;
 	size_t i = 0, n;
@@ -81,14 +81,14 @@ unsigned char *_router::list_nodes(enum tin_htype tp)
 
 	buff = msg_tmp<true>(tp);
 	
-	for (auto &p : tinstruct::nodes) {
+	for (auto &p : tgnstruct::nodes) {
 		n = HASHSIZE + 1 + (HASHSIZE + 4) * i++;
 
 		if (n >= HEADERSIZE)
 			break;
 
 		if ((ip = iptobytes(p.ip)) == nullptr) {
-			tinstorage::nodes.remove(p.ip);
+			tgnstorage::nodes.remove(p.ip);
 			break;
 		}
 

@@ -1,6 +1,6 @@
 /**
 *	socket.cpp - Модуль отвечающий за сокеты
-*	децентрализованной сети tin.
+*	децентрализованной сети TGN.
 *
 *	@mrrva - 2019
 */
@@ -15,7 +15,7 @@ using namespace std;
 */
 _socket::_socket(void)
 {
-	using tinnetwork::sok;
+	using tgnnetwork::sok;
 
 	this->s_data.srv.sin_addr.s_addr = INADDR_ANY;
 	this->s_data.srv.sin_port = htons(PORT);
@@ -38,9 +38,9 @@ _socket::~_socket(void)
 {
 	this->stop = true;
 
-	if (tinnetwork::sok != 0) {
-		shutdown(tinnetwork::sok, SHUT_RDWR);
-		close(tinnetwork::sok);
+	if (tgnnetwork::sok != 0) {
+		shutdown(tgnnetwork::sok, SHUT_RDWR);
+		close(tgnnetwork::sok);
 	}
 }
 /**
@@ -73,13 +73,13 @@ void _socket::set_opts(int &stream)
 */
 bool _socket::start(void)
 {
-	using tinnetwork::send;
-	using tinnetwork::recv;
+	using tgnnetwork::send;
+	using tgnnetwork::recv;
 
 	send = thread(&_socket::thread_send, this);
 	recv = thread(&_socket::thread_recv, this);
 
-#ifdef tin_DEBUG
+#ifdef TGN_DEBUG
 	cout << "Threads are started.\n";
 #endif
 	if (send.joinable() && recv.joinable())
@@ -92,10 +92,10 @@ bool _socket::start(void)
 */
 void _socket::thread_recv(void)
 {
-	using tinnetwork::sok;
+	using tgnnetwork::sok;
 
 	unsigned char buff[FULLSIZE];
-	struct tin_task request;
+	struct tgn_task request;
 	struct sockaddr_in user;
 	struct sockaddr *cl;
 	socklen_t sz;
@@ -114,7 +114,7 @@ void _socket::thread_recv(void)
 		memset(buff, 0x00, FULLSIZE);
 		request.client_in = user;
 
-		tinnetwork::requests << request;
+		tgnnetwork::requests << request;
 	}
 }
 /**
@@ -123,9 +123,9 @@ void _socket::thread_recv(void)
 *
 *	@t - Структура текущего задания.
 */
-void _socket::send_task(struct tin_task &t)
+void _socket::send_task(struct tgn_task &t)
 {
-	using tinnetwork::sok;
+	using tgnnetwork::sok;
 
 	struct sockaddr_in u = t.client_in;
 	size_t i = 0, hd_size = HEADERSIZE;
@@ -142,16 +142,16 @@ void _socket::send_task(struct tin_task &t)
 		sendto(sok, t.bytes, t.length, 0x100, cl,sz);
 		recvfrom(sok, buff, hd_size, 0x100, cl, &sz);
 
-		if (i >= tinstruct::nodes.size()) {
+		if (i >= tgnstruct::nodes.size()) {
 			break;
 		}
 
 		if (buff[0] != 0x00 && buff[0] != 0x10) {
-			tinstorage::nodes.ping(u);
+			tgnstorage::nodes.ping(u);
 			break;
 		}
 		
-		ip = tinstruct::nodes[i++].ip;
+		ip = tgnstruct::nodes[i++].ip;
 		u.sin_addr.s_addr = inet_addr(ip.c_str());
 	}
 	while (!t.target_only);
@@ -162,13 +162,13 @@ void _socket::send_task(struct tin_task &t)
 */
 void _socket::thread_send(void)
 {
-	using tinstruct::tasks;
+	using tgnstruct::tasks;
 
 	while (!this->stop) {
 		if (tasks.empty())
 			continue;
 
 		this->send_task(tasks[0]);
-		tinstorage::tasks.remove(tasks.begin());
+		tgnstorage::tasks.remove(tasks.begin());
 	}
 }

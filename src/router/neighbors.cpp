@@ -16,16 +16,16 @@ using namespace std;
 *	@msg - Сообщение от клиента сети.
 *	@skddr - Структура sockaddr_in.
 */
-struct tin_task _router::s_neighbors(tinmsg &msg,
+struct tgn_task _router::s_neighbors(tgnmsg &msg,
 	struct sockaddr_in &skddr)
 {
-	using tinstorage::neighbors;
-	using tinstorage::nodes;
+	using tgnstorage::neighbors;
+	using tgnstorage::nodes;
 
 	vector<unsigned char *> list;
-	struct tin_ipport ipport;
-	struct tin_task task;
-	struct tin_node node;
+	struct tgn_ipport ipport;
+	struct tgn_task task;
+	struct tgn_node node;
 
 	list = msg.info_neighbors();
 	ipport = ipport_get(skddr);
@@ -54,12 +54,12 @@ struct tin_task _router::s_neighbors(tinmsg &msg,
 *
 *	@s - Структура sockaddr_in.
 */
-struct tin_task _router::neighbors_list(struct sockaddr_in &s)
+struct tgn_task _router::neighbors_list(struct sockaddr_in &s)
 {
-	using tinstruct::clients;
+	using tgnstruct::clients;
 
 	size_t prt = INFOSIZE / HASHSIZE, n;
-	struct tin_task task;
+	struct tgn_task task;
 	unsigned char *buff;
 
 	prt = (prt > clients.size()) ? clients.size() : prt;

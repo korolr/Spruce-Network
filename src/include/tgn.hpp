@@ -1,12 +1,12 @@
 /**
-*	tin.hpp - Заголовочный файл децентрализованной
-*	сети tin. Здесь опублекованны все константы,
+*	tgn.hpp - Заголовочный файл децентрализованной
+*	сети TGN. Здесь опублекованны все константы,
 *	прототипы и структуры проекта.
 *
 *	@mrrva - 2019
 */
-#ifndef TIN
-#define TIN
+#ifndef TGN
+#define TGN
 
 #include <iostream>
 #include <functional>
@@ -25,7 +25,7 @@
 #include <sstream>
 #include <sqlite3.h>
 #include <sodium.h>
-#define TIN_DEBUG 1;
+#define TGN_DEBUG 1;
 /**
 *	Константы проекта.
 */
