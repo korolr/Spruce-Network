@@ -80,7 +80,7 @@ bool _socket::start(void)
 	recv = thread(&_socket::thread_recv, this);
 
 #ifdef TGN_DEBUG
-	cout << "Threads are started.\n";
+	cout << "[S] Threads started.\n";
 #endif
 	if (send.joinable() && recv.joinable())
 		return true;

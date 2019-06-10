@@ -36,6 +36,9 @@ struct tgn_task _router::s_neighbors(tgnmsg &msg,
 		if (!nodes.find_ip(node, ipport.ip))
 			return task;
 
+	#ifdef TGN_DEBUG
+		cout << "[I] Received neighbors.\n";
+	#endif
 		neighbors.clear(node.hash);
 
 		for (auto &p : list) {
@@ -46,6 +49,9 @@ struct tgn_task _router::s_neighbors(tgnmsg &msg,
 		return task;
 	}
 
+#ifdef TGN_DEBUG
+	cout << "[I] Adding new neighbors.\n";
+#endif
 	return this->neighbors_list(skddr);
 }
 /**

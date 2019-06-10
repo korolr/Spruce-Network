@@ -37,8 +37,7 @@ unsigned char *tgnencryption::pack(unsigned char *text,
 	size_t len;
 
 	if (!text || !key) {
-		cout << "Error: Incorrect args in "
-			<< "tgnencryption::pack\n";
+		cout << "[E] tgnencryption::pack.\n";
 		return nullptr;
 	}
 
@@ -64,8 +63,7 @@ unsigned char *tgnencryption::unpack(unsigned char *text)
 	size_t len;
 
 	if (!text) {
-		cout << "Error: Incorrect args in "
-			<< "tgnencryption::unpack\n";
+		cout << "[E] tgnencryption::unpack.\n";
 		return nullptr;
 	}
 
@@ -75,7 +73,7 @@ unsigned char *tgnencryption::unpack(unsigned char *text)
 
 	if (crypto_box_seal_open(buffer, text, len
 		, public_key, secret_key) != 0) {
-		cout << "Error: crypto_box_seal_open in "
+		cout << "[E] crypto_box_seal_open in "
 			<< "tgnencryption::unpack\n";
 		return nullptr;
 	}

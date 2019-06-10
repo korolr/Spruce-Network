@@ -290,20 +290,38 @@ pair<unsigned char *, unsigned char *> tgnmsg::info_garlic(void)
 {
 	typedef pair<unsigned char *, unsigned char *> pr;
 	unsigned char *s_ptr = this->bytes + HASHSIZE + 1;
-	pair<unsigned char *, unsigned char *> buffer;
 	unsigned char *tmp_1, *tmp_2;
 
-	if (bytes_sum<INFOSIZE>(s_ptr) == 0x00) {
-		buffer = pr(nullptr, nullptr);
-		return buffer;
-	}
+	if (bytes_sum<INFOSIZE>(s_ptr) == 0x00)
+		return pr(nullptr, nullptr);
 
 	tmp_1 = new unsigned char[HASHSIZE];
 	tmp_2 = new unsigned char[HASHSIZE];
 
 	memcpy(tmp_1, s_ptr, HASHSIZE);
 	memcpy(tmp_2, s_ptr + HASHSIZE, HASHSIZE);
-	buffer = pr(tmp_1, tmp_2);
 
-	return buffer;
+	return pr(tmp_1, tmp_2);
+}
+
+pair<size_t, unsigned char *> tgnmsg::info_valid(void)
+{
+	unsigned char *s_ptr = this->bytes + HASHSIZE + 1;
+	typedef pair<size_t, unsigned char *> pr;
+	pair<size_t, unsigned char *> buffer;
+	size_t len = INFOSIZE - 1;
+	unsigned char *tmp;
+
+	if (bytes_sum<INFOSIZE>(s_ptr) == 0x00)
+		return pr(0, nullptr);
+
+	if (*s_ptr == 0x00) {
+		tmp = new unsigned char[len];
+		memcpy(tmp, s_ptr + 1, len);
+
+		return pr(1, tmp);
+	}
+
+	/* HERE!!!!!!!!!!!!!!!! */
+	return pr(2, nullptr)
 }

@@ -61,7 +61,7 @@ int main(int argc, char *argv[])
 	*	Startgng threads.	
 	*/
 	if (!tgnnetwork::socket.start()) {
-		cout << "Can't start threads.\n";
+		cout << "[E] tgnnetwork::socket.start.\n";
 		return 1;
 	}
 	/**
@@ -70,8 +70,8 @@ int main(int argc, char *argv[])
 	while (true) {
 		updnnbrs = tgnstorage::neighbors.timelist();
 		tgnstorage::clients.remove();
+		tgnstorage::routes.remove();
 		clock = system_clock::now();
-// DNS REMOVING...
 		/**
 		*	Actions if neighbors list is empty.
 		*/
@@ -80,7 +80,7 @@ int main(int argc, char *argv[])
 				buffer = msg_tmp<true>(S_REQUEST_CLIENTS);
 
 				if (buffer == nullptr) {
-					cout << "Error: Can't allocate mem.\n";
+					cout << "[E] Allocationg of memory.\n";
 					return 1;
 				}
 
@@ -103,7 +103,7 @@ int main(int argc, char *argv[])
 			buffer = msg_tmp<true>(S_REQUEST_CLIENTS);
 
 			if (buffer == nullptr) {
-				cout << "Error: Can't allocate mem.\n";
+				cout << "[E] Allocationg of memory.\n";
 				return 1;
 			}
 
@@ -133,7 +133,7 @@ int main(int argc, char *argv[])
 			buffer = msg_tmp<true>(S_REQUEST_NODES);
 
 			if (buffer == nullptr) {
-				cout << "Error: Can't allocate mem.\n";
+				cout << "[E] Allocationg of memory.\n";
 				return 1;
 			}
 

@@ -20,7 +20,7 @@ _database::_database(void)
 	db = nullptr;
 
 	if (sqlite3_open(path.c_str(), &db) != SQLITE_OK) {
-		cout << "Error: Can't connect to db.\n";
+		cout << "[E] _database::_database.\n";
 		exit(1);
 	}
 
@@ -48,8 +48,7 @@ void _database::set_var(string name, string value)
 	string q;
 
 	if (name.length() < 2 || value.length() < 1) {
-		cout << "Error: Incorrect args in _database::"
-			<< "set_var" << endl;
+		cout << "[E] _database::set_var(args..).\n";
 		return;
 	}
 
@@ -60,8 +59,7 @@ void _database::set_var(string name, string value)
 	sqlite3_prepare_v2(this->db, q.c_str(), -1, &rs, NULL);
 
 	if (sqlite3_step(rs) != SQLITE_DONE)
-		cout << "Error: Can't insert data in _database::"
-			<< "set_var" << endl;
+		cout << "[E] _database::set_var.\n";
 
 	this->var_mutex.unlock();
 
@@ -82,8 +80,7 @@ string _database::get_var(string name)
 	string q, r_data;
 
 	if (name.length() < 2) {
-		cout << "Error: Incorrect arg in _database::"
-			<< "get_var" << endl;
+		cout << "[E] _database::get_var(arg..).\n";
 		return "";
 	}
 
@@ -94,8 +91,7 @@ string _database::get_var(string name)
 	sqlite3_prepare_v2(this->db, q.c_str(), -1, &rs, NULL);
 
 	if (sqlite3_step(rs) != SQLITE_ROW) {
-		cout << "Warring: Can't find data in _database::"
-			<< "get_var.\n";
+		cout << "[E] _database::get_var.\n";
 
 		if (rs != nullptr)
 			sqlite3_finalize(rs);
@@ -126,8 +122,7 @@ void _database::remove_var(string name)
 	string q;
 
 	if (name.length() < 2) {
-		cout << "Error: Incorrect arg in _database::"
-			<< "remove_var" << endl;
+		cout << "[E] _database::remove_var.\n";
 		return;
 	}
 
@@ -156,8 +151,7 @@ void _database::remove_node(string ip)
 	string q;
 
 	if (ip.length() < 5) {
-		cout << "Error: Incorrect arg in _database::"
-			<< "remove_node" << endl;
+		cout << "[E] _database::remove_node.\n";
 		return;
 	}
 
@@ -186,8 +180,7 @@ void _database::new_node(string ip, string hash)
 	stringstream ss;
 
 	if (ip.length() < 5) {
-		cout << "Error: Incorrect arg in _database::"
-			<< "new_node" << endl;
+		cout << "[E] _database::new_node.\n";
 		return;
 	}
 
@@ -217,8 +210,7 @@ void _database::ping_node(string ip)
 	stringstream ss;
 
 	if (ip.length() < 5) {
-		cout << "Error: Incorrect arg in _database::"
-			<< "ping_node" << endl;
+		cout << "[E] _database::ping_node.\n";
 		return;
 	}
 
@@ -315,7 +307,7 @@ void _database::create_tables(void)
 			&rs, NULL);
 
 		if (sqlite3_step(rs) != SQLITE_DONE) {
-			cout << "Error: Can't create table.\n";
+			cout << "[E] _database::create_tables.\n";
 			exit(1);
 		}
 	}

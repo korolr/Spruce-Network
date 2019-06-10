@@ -1,11 +1,5 @@
 
-#include "../include/network.hpp"
-#include "../include/storage.hpp"
-#include "../include/struct.hpp"
+#include "../include/service.hpp"
 
 using namespace std;
 
-int main()
-{
-	return 0;
-}

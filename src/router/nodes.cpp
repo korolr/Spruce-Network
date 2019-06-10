@@ -29,6 +29,9 @@ struct tgn_task _router::su_nodes(tgnmsg &msg,
 	list = msg.info_nodes();
 
 	if (!list.empty() && !is_client) {
+	#ifdef TGN_DEBUG
+		cout << "[I] Received list of nodes.\n";
+	#endif
 		this->insert_nodes(list);
 		task.bytes[0] = 0x00;
 		return task;
@@ -44,6 +47,9 @@ struct tgn_task _router::su_nodes(tgnmsg &msg,
 	task.target_only = true;
 	task.client_in = skddr;
 
+#ifdef TGN_DEBUG
+	cout << "[I] Sent list of nodes.\n";
+#endif
 	delete[] buffer;
 	return task;
 }
