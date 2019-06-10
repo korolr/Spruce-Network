@@ -1,0 +1,27 @@
+The illum network (TIN)
+=======================
+
+The illum network is a decentralized p2p network. Current status: in
+developing. You can read some information about concept of network 
+here:
+  https://medium.com/@mrrva_dev
+
+Project modules
+---------------
+
+- Network:    Works with socket and some structs.
+- Router:     Makes routes for connected clients and nodes.
+- Storage:    Serves database and structures.
+- Encryption: Encrypting network messages.
+
+Requirements
+------------
+
+- sqlite3 (libsqlite3-dev)
+- sodium (libsodium-dev)
+
+Copyright
+---------
+
+Copyright (C) 2019  mrrva <odenscp@gmail.com>
+
