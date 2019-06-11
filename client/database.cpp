@@ -1,4 +1,9 @@
-
+/**
+*	database.cpp - Модуль отвечающий за работу
+*	с базой данных.
+*
+*	@mrrva - 2019
+*/
 #include "include/database.hpp"
 /**
 *	Используемые пространства имен и объекты.
@@ -20,7 +25,10 @@ _database::_database(void)
 
 	this->create_tables();
 }
-
+/**
+*	_database::get_nodes - Извлечение списка всех нод
+*	из базы данных.
+*/
 map<string, string> _database::get_nodes(void)
 {
 	string q = "SELECT * FROM `nodes`";
@@ -42,7 +50,11 @@ map<string, string> _database::get_nodes(void)
 
 	return list;
 }
-
+/**
+*	_database::remove_node - Удаление ноды из базы данных.
+*
+*	@ip - Ip адрес ноды.
+*/
 void _database::remove_node(string ip)
 {
 	sqlite3_stmt *rs = nullptr;
@@ -60,7 +72,13 @@ void _database::remove_node(string ip)
 	if (rs != nullptr)
 		sqlite3_finalize(rs);
 }
-
+/**
+*	_database::new_node - Добавление новой ноды в базу
+*	данных.
+*
+*	@ip - Ip адрес ноды.
+*	@hash - Hash ноды.
+*/
 void _database::new_node(string ip, string hash)
 {
 	sqlite3_stmt *rs = nullptr;

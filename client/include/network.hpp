@@ -2,7 +2,7 @@
 #ifndef TGN_NETWORK
 #define TGN_NETWORK
 
-#include "../include/network.hpp"
+#include "tgn.hpp"
 /**
 *	Доступные структуры.
 */
