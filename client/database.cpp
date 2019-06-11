@@ -98,7 +98,6 @@ string _database::get_var(string name)
 		return "";
 	}
 
-	this->var_mutex.lock();
 
 	q = "SELECT `value` FROM `settgngs` WHERE `name`='" +
 		name + "'";
@@ -109,12 +108,9 @@ string _database::get_var(string name)
 
 		if (rs != nullptr)
 			sqlite3_finalize(rs);
-		this->var_mutex.unlock();
 		
 		return "";
 	}
-
-	this->var_mutex.unlock();
 
 	f_data = const_cast<uc *>(sqlite3_column_text(rs, 0));
 	r_data = string(reinterpret_cast<char *>(f_data));
@@ -140,15 +136,11 @@ void _database::remove_var(string name)
 		return;
 	}
 
-	this->var_mutex.lock();
-
 	q = "DELETE FROM `settgngs` WHERE `name`='" +
 		name + "'";
 
 	sqlite3_prepare_v2(this->db, q.c_str(), -1, &rs, NULL);
 	sqlite3_step(rs);
-
-	this->var_mutex.unlock();
 
 	if (rs != nullptr)
 		sqlite3_finalize(rs);
