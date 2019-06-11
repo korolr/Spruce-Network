@@ -290,18 +290,18 @@ pair<unsigned char *, unsigned char *> tgnmsg::info_garlic(void)
 {
 	typedef pair<unsigned char *, unsigned char *> pr;
 	unsigned char *s_ptr = this->bytes + HASHSIZE + 1;
-	unsigned char *tmp_1, *tmp_2;
+	unsigned char *to, *from;
 
 	if (bytes_sum<INFOSIZE>(s_ptr) == 0x00)
 		return pr(nullptr, nullptr);
 
-	tmp_1 = new unsigned char[HASHSIZE];
-	tmp_2 = new unsigned char[HASHSIZE];
+	from = new unsigned char[HASHSIZE];
+	to = new unsigned char[HASHSIZE];
 
-	memcpy(tmp_1, s_ptr, HASHSIZE);
-	memcpy(tmp_2, s_ptr + HASHSIZE, HASHSIZE);
+	memcpy(from, s_ptr + HASHSIZE, HASHSIZE);
+	memcpy(to, s_ptr, HASHSIZE);
 
-	return pr(tmp_1, tmp_2);
+	return pr(to, from);
 }
 
 pair<size_t, unsigned char *> tgnmsg::info_valid(void)

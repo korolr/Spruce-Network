@@ -5,8 +5,8 @@
 *
 *	@mrrva - 2019
 */
-#ifndef TGN
-#define TGN
+#ifndef TGN_NODE
+#define TGN_NODE
 
 #include <iostream>
 #include <functional>

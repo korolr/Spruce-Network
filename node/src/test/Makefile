@@ -5,7 +5,7 @@ main:
 	../message.cpp ../storage/database.cpp				\
 	../router/namespace.cpp ../router/neighbors.cpp		\
 	../storage/nodes.cpp ../storage/clients.cpp			\
-	../encryption/namespace.cpp ../storage/tasks.cpp	\
+	../encryption.cpp ../storage/tasks.cpp				\
 	../router/garlic.cpp ../storage/neighbors.cpp 		\
 	../storage/routes.cpp ../router/find.cpp			\
 	../router/nodes.cpp \
