@@ -22,7 +22,8 @@ _socket::_socket(void)
 	this->s_data.srv.sin_family = AF_INET;
 
 	if ((sok = socket(AF_INET, SOCK_DGRAM, 0)) == 0) {
-		cout << "Error: Can't open socket.\n";
+		cout << "[E] _network::_network: start "
+			<< "socket.\n";
 		exit(1);
 	}
 
@@ -55,7 +56,7 @@ void _socket::set_opts(int &stream)
 	char *t_opt;
 
 	if (stream == 0) {
-		cout << "Error: Can't open socket.\n";
+		cout << "[E] _socket::set_opts.\n";
 		return;
 	}
 
