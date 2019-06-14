@@ -199,6 +199,34 @@ unsigned char *tgnmsg::info_msg(void)
 	return temp;
 }
 /**
+*	tgnmsg::user_valid - Функция проверки валидного
+*	типа сообщения клиента.
+*/
+bool tgnmsg::client_valid(void)
+{
+	bool status = false;
+
+	if (this->bytes[0] <= 0x07
+		&& this->bytes[0] % 2 != 0)
+		status = true;
+
+	return status;
+}
+/**
+*	tgnmsg::user_valid - Функция проверки валидного
+*	типа сообщения ноды.
+*/
+bool tgnmsg::node_valid(void)
+{
+	bool status = false;
+
+	if (this->bytes[0] <= 0x1f
+		&& this->bytes[0] >= 0x11)
+		status = true;
+
+	return status;
+}
+/**
 *	tgnmsg::info_nodes - Функция считывания данных
 *	нод в блоке информации сообщения.
 */
@@ -266,19 +294,17 @@ vector<unsigned char *> tgnmsg::info_neighbors(void)
 *	tgnmsg::info_find - Функция считывания данных
 *	поиска клиента в блоке информации сообщения.
 */
-struct find_request tgnmsg::info_find(void)
+struct tgn_find_req tgnmsg::info_find(void)
 {
 	unsigned char *s_ptr = this->bytes + HASHSIZE + 1;
-	struct find_request buffer;
-	string target, from;
+	struct tgn_find_req buffer;
 
 	if (bytes_sum<INFOSIZE>(s_ptr) == 0x00)
 		return buffer;
 
-	buffer.from = ipfrombytes(s_ptr + HASHSIZE + 4 + 1);
-	buffer.target = ipfrombytes(s_ptr + HASHSIZE + 1);
-	buffer.found = (*s_ptr == 0x00) ? false : true;
-	memcpy(buffer.hash, s_ptr + 1, HASHSIZE);
+	buffer.from = ipfrombytes(s_ptr + HASHSIZE + 4);
+	buffer.owner = ipfrombytes(s_ptr + HASHSIZE);
+	memcpy(buffer.hash, s_ptr, HASHSIZE);
 
 	return buffer;
 }
@@ -286,42 +312,19 @@ struct find_request tgnmsg::info_find(void)
 *	tgnmsg::info_garlic - Функция считывания данных
 *	чесночной маршрутизации.
 */
-pair<unsigned char *, unsigned char *> tgnmsg::info_garlic(void)
-{
-	typedef pair<unsigned char *, unsigned char *> pr;
-	unsigned char *s_ptr = this->bytes + HASHSIZE + 1;
-	unsigned char *to, *from;
-
-	if (bytes_sum<INFOSIZE>(s_ptr) == 0x00)
-		return pr(nullptr, nullptr);
-
-	from = new unsigned char[HASHSIZE];
-	to = new unsigned char[HASHSIZE];
-
-	memcpy(from, s_ptr + HASHSIZE, HASHSIZE);
-	memcpy(to, s_ptr, HASHSIZE);
-
-	return pr(to, from);
-}
-
-pair<size_t, unsigned char *> tgnmsg::info_valid(void)
+struct tgn_garlic_req tgnmsg::info_garlic(void)
 {
 	unsigned char *s_ptr = this->bytes + HASHSIZE + 1;
-	typedef pair<size_t, unsigned char *> pr;
-	pair<size_t, unsigned char *> buffer;
-	size_t len = INFOSIZE - 1;
-	unsigned char *tmp;
+	unsigned char st = *(s_ptr + HASHSIZE + 1);
+	struct tgn_garlic_req req;
 
-	if (bytes_sum<INFOSIZE>(s_ptr) == 0x00)
-		return pr(0, nullptr);
+	if (bytes_sum<INFOSIZE>(s_ptr) == 0x00
+		|| st > G_ERROR_TARGET)
+		return req;
 
-	if (*s_ptr == 0x00) {
-		tmp = new unsigned char[len];
-		memcpy(tmp, s_ptr + 1, len);
+	req.status = static_cast<enum tgn_garlic>(st);
+	memcpy(req.from, s_ptr + HASHSIZE, HASHSIZE);
+	memcpy(req.to, s_ptr, HASHSIZE);
 
-		return pr(1, tmp);
-	}
-
-	/* HERE!!!!!!!!!!!!!!!! */
-	return pr(2, nullptr)
+	return req;
 }

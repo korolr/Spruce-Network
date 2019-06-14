@@ -4,7 +4,7 @@
 *
 *	@mrrva - 2019
 */
-#include "../include/encryption.hpp"
+#include "include/encryption.hpp"
 /**
 *	Используемые пространства имен и объекты.
 */

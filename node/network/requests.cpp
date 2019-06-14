@@ -40,7 +40,6 @@ void _requests::thr_client(tgnmsg msg,
 {
 	unsigned char *resp, *hash = msg.byte_key();
 	enum tgn_htype type = msg.header_type();
-	struct tgn_task response;
 	struct tgn_ipport ipport;
 
 	if (type == INDEFINITE_MESSAGE)
@@ -49,17 +48,19 @@ void _requests::thr_client(tgnmsg msg,
 	ipport = ipport_get(skddr);
 	tgnstorage::clients.update(hash, ipport);
 
-	if ((resp = msg_usr<true>(type)) == nullptr)
+	if (msg.client_valid() == false) {
 		resp = msg_tmp<true>(U_RESPONSE_DOS);
+		this->socket_response(resp, skddr);
 
-	this->socket_response(resp, skddr);
-	response = tgnrouter::client(msg, skddr);
-
-	if (response.bytes[0] != 0x00)
-		tgnstorage::tasks.add(response);
-
-	if (hash != nullptr)
 		delete[] hash;
+		delete[] resp;
+		return;
+	}
+
+	resp = tgnrouter::client(msg, skddr);
+	this->socket_response(resp, skddr);
+
+	delete[] hash;
 	delete[] resp;
 }
 /**
@@ -74,22 +75,22 @@ void _requests::thr_node(tgnmsg msg,
 {
 	struct tgn_ipport ipport = ipport_get(skddr);
 	enum tgn_htype type = msg.header_type();
-	struct tgn_task response;
 	unsigned char *resp, *hash;
 	struct tgn_node node;
 
-	if (type == INDEFINITE_MESSAGE
-		|| ipport.port != PORT)
+	if (type == INDEFINITE_MESSAGE)
 		return;
 
-	if ((resp = msg_usr<true>(type)) == nullptr)
+	if (ipport.port != PORT || !msg.node_valid()) {
 		resp = msg_tmp<true>(S_RESPONSE_DOS);
+		this->socket_response(resp, skddr);
 
+		delete[] resp;
+		return;
+	}
+
+	resp = tgnrouter::node(msg, skddr);
 	this->socket_response(resp, skddr);
-	response = tgnrouter::node(msg, skddr);
-
-	if (response.bytes[0] != 0x00)
-		tgnstorage::tasks.add(response);
 
 	if ((hash = msg.byte_key()) == nullptr) {
 		delete[] resp;

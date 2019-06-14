@@ -56,10 +56,33 @@ enum tgn_htype {
 	S_RESPONSE_VALID	= 0x1f
 };
 
-struct find_request {
+enum tgn_garlic {
+	/**
+	*	Не транспортные типы.
+	*/
+	G_EMPTY_STATUS		= 0x00,
+	G_REQUEST_FIND		= 0x01,
+	/**
+	*	Успешные типы передачи.
+	*/
+	G_SUCCESS_SERVER	= 0x02,
+	G_SUCCESS_TARGET	= 0x03,
+	/**
+	*	Ошибки в передаче.
+	*/
+	G_ERROR_ROUTE		= 0x04,
+	G_ERROR_TARGET		= 0x05
+};
+
+struct tgn_find_req {
 	unsigned char hash[HASHSIZE];
-	std::string target, from;
-	bool found;
+	std::string owner, from;
+};
+
+struct tgn_garlic_req {
+	unsigned char from[HASHSIZE];
+	unsigned char to[HASHSIZE];
+	enum tgn_garlic status;
 };
 /**
 *	Классы модуля.
@@ -72,11 +95,11 @@ class tgnmsg {
 		size_t length_detect(unsigned char *);
 
 	public :
-		std::pair<unsigned char *, unsigned char *> info_garlic(void);
 		std::map<unsigned char *, std::string> info_nodes(void);
 		std::vector<unsigned char *> info_neighbors(void);
+		struct tgn_garlic_req info_garlic(void);
 		tgnmsg(unsigned char *bytes = nullptr);
-		struct find_request info_find(void);
+		struct tgn_find_req info_find(void);
 		enum tgn_htype header_type(void);
 		unsigned char *to_bytes(size_t &);
 		unsigned char *garlic_msg(void);
@@ -86,6 +109,8 @@ class tgnmsg {
 		void operator =(tgnmsg &);
 		std::string str_key(void);
 		bool is_header_only(void);
+		bool client_valid(void);
+		bool node_valid(void);
 		bool is_node(void);
 };
 /**

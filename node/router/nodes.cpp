@@ -10,58 +10,58 @@
 */
 using namespace std;
 /**
-*	_router::su_nodes - Функция обработки маршрутов
-*	для отправки или обработки списка нод.
+*	_router::req_nodes - Функция обработки маршрутов
+*	для отправки списка нод.
 *
 *	@msg - Сообщение от клиента сети.
 *	@skddr - Структура sockaddr_in.
-*	@is_client - Сообщение от клиента.
+*	@client - Сообщение от клиента.
 */
-struct tgn_task _router::su_nodes(tgnmsg &msg,
-	struct sockaddr_in &skddr, bool is_client)
+unsigned char *_router::req_nodes(tgnmsg &msg,
+	struct sockaddr_in &skddr, bool client)
 {
-	map<unsigned char *, string> list;
-	unsigned char *buffer;
+	size_t i = 0, s, hs = HASHSIZE;
+	unsigned char *buff, *ip;
 	enum tgn_htype htype;
-	struct tgn_task task;
 
-	htype = (is_client) ? U_REQUEST_NODES : S_REQUEST_NODES;
-	list = msg.info_nodes();
+	htype = (client) ? U_RESPONSE_NODES:
+		S_RESPONSE_NODES;
+	buff = msg_tmp<true>(htype);
 
-	if (!list.empty() && !is_client) {
-	#ifdef TGN_DEBUG
-		cout << "[I] Received list of nodes.\n";
-	#endif
-		this->insert_nodes(list);
-		task.bytes[0] = 0x00;
-		return task;
+	for (auto &p : tgnstruct::nodes) {
+		s = hs + 1 + (hs + 4) * i++;
+
+		if (s >= HEADERSIZE)
+			break;
+
+		ip = iptobytes(p.ip);
+
+		if (ip == nullptr) {
+			tgnstorage::nodes.remove(p.ip);
+			break;
+		}
+
+		memcpy(buff + s, p.hash, HASHSIZE);
+		memcpy(buff + s + HASHSIZE, ip, 4);
+		delete[] ip;
 	}
 
-	if ((buffer = this->list_nodes(htype)) == nullptr) {
-		task.bytes[0] = 0x00;
-		return task;
-	}
-
-	memcpy(task.bytes, buffer, HEADERSIZE);
-	task.length = HEADERSIZE;
-	task.target_only = true;
-	task.client_in = skddr;
-
-#ifdef TGN_DEBUG
-	cout << "[I] Sent list of nodes.\n";
-#endif
-	delete[] buffer;
-	return task;
+	return buff;
 }
 /**
-*	_router::insert_nodes - Функция добавления новых нод в
-*	в общий список известных нод.
+*	_router::resp_nodes - Функция обработки маршрутов
+*	для получения списка нод.
 *
-*	@list - Список новых нод.
+*	@msg - Сообщение от клиента сети.
+*	@skddr - Структура sockaddr_in.
 */
-void _router::insert_nodes(map<unsigned char *, string> list)
+unsigned char *_router::rsp_nodes(tgnmsg &msg,
+	struct sockaddr_in &skddr)
 {
+	map<unsigned char *, string> list;
 	struct tgn_node node;
+
+	list = msg.info_nodes();
 
 	for (auto &p : list) {
 		node.ip = p.second;
@@ -70,38 +70,6 @@ void _router::insert_nodes(map<unsigned char *, string> list)
 
 		delete[] p.first;
 	}
-}
-/**
-*	_router::insert_nodes - Функция извлечения нод из
-*	общего списка и генерация сообщения.
-*
-*	@tp - Тип сообщения.
-*/
-unsigned char *_router::list_nodes(enum tgn_htype tp)
-{
-	unsigned char *buff, *ip;
-	size_t i = 0, n;
 
-	if (tp != U_REQUEST_NODES && tp != S_REQUEST_NODES)
-		return nullptr;
-
-	buff = msg_tmp<true>(tp);
-	
-	for (auto &p : tgnstruct::nodes) {
-		n = HASHSIZE + 1 + (HASHSIZE + 4) * i++;
-
-		if (n >= HEADERSIZE)
-			break;
-
-		if ((ip = iptobytes(p.ip)) == nullptr) {
-			tgnstorage::nodes.remove(p.ip);
-			break;
-		}
-
-		memcpy(buff + n, p.hash, HASHSIZE);
-		memcpy(buff + n + HASHSIZE, ip, 4);
-		delete[] ip;
-	}
-
-	return buff;
+	return nullptr;
 }

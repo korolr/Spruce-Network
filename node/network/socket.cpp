@@ -120,7 +120,7 @@ void _socket::thread_recv(void)
 }
 /**
 *	_socket::send_task - Функция циклической отправки
-*	пакета.
+*	пакета задания.
 *
 *	@t - Структура текущего задания.
 */
@@ -129,31 +129,24 @@ void _socket::send_task(struct tgn_task &t)
 	using tgnnetwork::sok;
 
 	struct sockaddr_in u = t.client_in;
-	size_t i = 0, hd_size = HEADERSIZE;
-	unsigned char buff[FULLSIZE];
 	struct sockaddr *cl;
+	string ipaddr;
+	size_t i = 0;
 	socklen_t sz;
-	string ip;
 
 	cl = reinterpret_cast<struct sockaddr *>(&u);
 	sz = sizeof(struct sockaddr_in);
 	u.sin_family = AF_INET;
 
 	do {
-		sendto(sok, t.bytes, t.length, 0x100, cl,sz);
-		recvfrom(sok, buff, hd_size, 0x100, cl, &sz);
+		sendto(sok, t.bytes, t.length, 0x100, cl ,sz);
 
 		if (i >= tgnstruct::nodes.size()) {
 			break;
 		}
 
-		if (buff[0] != 0x00 && buff[0] != 0x10) {
-			tgnstorage::nodes.ping(u);
-			break;
-		}
-		
-		ip = tgnstruct::nodes[i++].ip;
-		u.sin_addr.s_addr = inet_addr(ip.c_str());
+		ipaddr = tgnstruct::nodes[i++].ip;
+		u.sin_addr.s_addr = inet_addr(ipaddr.c_str());
 	}
 	while (!t.target_only);
 }
