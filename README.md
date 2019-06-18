@@ -14,7 +14,9 @@ This project finds other users and communicates with them for building the whole
 
 ## What is it for?
 The Garlic Network is intended for engineers and enthusiasts looking to build a new safe project based on TGN.
+
 Thanks to decentralization nature, this project is a great foundation for developers who built applications with security and reliability in mind. It can be literally anything: from a simple instant messaging app to own private network with onion routing.
+
 There is a simple C/C++ library for building your own project based on TGN - [libgarlic](https://github.com/The-Garlic-Network/libgarlic).
 
 
@@ -22,3 +24,4 @@ There is a simple C/C++ library for building your own project based on TGN - [li
 The Garlic Network is licensed under the MIT. Check
 [LICENSE](https://github.com/The-Garlic-Network/The-Garlic-Network/blob/master/LICENSE) for the full
 license text.
+
