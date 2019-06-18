@@ -312,17 +312,17 @@ struct tgn_find_req tgnmsg::info_find(void)
 *	tgnmsg::info_garlic - Функция считывания данных
 *	чесночной маршрутизации.
 */
-struct tgn_garlic_req tgnmsg::info_garlic(void)
+struct tgn_garlic tgnmsg::info_garlic(void)
 {
 	unsigned char *s_ptr = this->bytes + HASHSIZE + 1;
 	unsigned char st = *(s_ptr + HASHSIZE + 1);
-	struct tgn_garlic_req req;
+	struct tgn_garlic req;
 
 	if (bytes_sum<INFOSIZE>(s_ptr) == 0x00
-		|| st > G_ERROR_TARGET)
+		|| st > ERROR_TARGET)
 		return req;
 
-	req.status = static_cast<enum tgn_garlic>(st);
+	req.status = static_cast<enum tgn_status>(st);
 	memcpy(req.from, s_ptr + HASHSIZE, HASHSIZE);
 	memcpy(req.to, s_ptr, HASHSIZE);
 

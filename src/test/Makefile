@@ -6,7 +6,7 @@ main:
 	../router/namespace.cpp ../router/neighbors.cpp		\
 	../storage/nodes.cpp ../storage/clients.cpp			\
 	../encryption.cpp ../storage/tasks.cpp				\
-	../router/garlic.cpp ../storage/neighbors.cpp 		\
+	../router/garlic.cpp ../storage/neighbors.cpp		\
 	../storage/routes.cpp ../router/find.cpp			\
-	../router/nodes.cpp \
+	../router/nodes.cpp ../storage/garlic.cpp			\
 	-pthread -lsqlite3 -lsodium

@@ -37,10 +37,6 @@ unsigned char *tgnrouter::client(tgnmsg msg,
 		resp = router.client_garlic(msg, skddr);
 		break;
 
-	case U_RESPONSE_GARLIC:
-		resp = router.c_status_garlic(msg, skddr);
-		return resp;
-
 	default:
 		resp = nullptr;
 		break;
@@ -102,7 +98,7 @@ unsigned char *tgnrouter::node(tgnmsg msg,
 		break;
 
 	case S_RESPONSE_GARLIC:
-		resp = router.n_status_garlic(msg, skddr);
+		resp = router.status_garlic(msg, skddr);
 		return resp;
 
 	default:

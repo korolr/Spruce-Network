@@ -15,74 +15,9 @@
 /**
 *	Доступные структуры.
 */
-enum tgn_htype {
-	INDEFINITE_MESSAGE	= 0x99,
-	/**
-	*	Клиентские типы сообщений.
-	*/
-	U_REQUEST_DOS		= 0x00,
-	U_RESPONSE_DOS		= 0x00,
-
-	U_REQUEST_NODES		= 0x01,
-	U_RESPONSE_NODES	= 0x02,
-
-	U_REQUEST_PING		= 0x03,
-	U_RESPONSE_PING		= 0x04,
-
-	U_REQUEST_GARLIC	= 0x05,
-	U_RESPONSE_GARLIC	= 0x06,
-
-	U_REQUEST_VALID		= 0x07,
-	U_RESPONSE_VALID	= 0x08,
-	/**
-	*	Серверные типы сообщений.
-	*/
-	S_REQUEST_DOS		= 0x10,
-	S_RESPONSE_DOS		= 0x10,
-
-	S_REQUEST_NODES		= 0x11,
-	S_RESPONSE_NODES	= 0x12,
-
-	S_REQUEST_CLIENTS	= 0x13,
-	S_RESPONSE_CLIENTS	= 0x14,
-
-	S_REQUEST_FIND		= 0x15,
-	S_RESPONSE_FIND		= 0x16,
-
-	S_REQUEST_GARLIC	= 0x17,
-	S_RESPONSE_GARLIC	= 0x18,
-
-	S_REQUEST_VALID		= 0x1e,
-	S_RESPONSE_VALID	= 0x1f
-};
-
-enum tgn_garlic {
-	/**
-	*	Не транспортные типы.
-	*/
-	G_EMPTY_STATUS		= 0x00,
-	G_REQUEST_FIND		= 0x01,
-	/**
-	*	Успешные типы передачи.
-	*/
-	G_SUCCESS_SERVER	= 0x02,
-	G_SUCCESS_TARGET	= 0x03,
-	/**
-	*	Ошибки в передаче.
-	*/
-	G_ERROR_ROUTE		= 0x04,
-	G_ERROR_TARGET		= 0x05
-};
-
 struct tgn_find_req {
 	unsigned char hash[HASHSIZE];
 	std::string owner, from;
-};
-
-struct tgn_garlic_req {
-	unsigned char from[HASHSIZE];
-	unsigned char to[HASHSIZE];
-	enum tgn_garlic status;
 };
 /**
 *	Классы модуля.
@@ -97,9 +32,9 @@ class tgnmsg {
 	public :
 		std::map<unsigned char *, std::string> info_nodes(void);
 		std::vector<unsigned char *> info_neighbors(void);
-		struct tgn_garlic_req info_garlic(void);
 		tgnmsg(unsigned char *bytes = nullptr);
 		struct tgn_find_req info_find(void);
+		struct tgn_garlic info_garlic(void);
 		enum tgn_htype header_type(void);
 		unsigned char *to_bytes(size_t &);
 		unsigned char *garlic_msg(void);

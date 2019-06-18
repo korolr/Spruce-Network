@@ -104,6 +104,18 @@ class _routes {
 		size_t exists(unsigned char *);
 		void remove(void);
 };
+
+class _garlic {
+	private :
+		std::mutex mute;
+
+	public :
+		void set_status(unsigned char *, unsigned char *, enum tgn_status);
+		bool find(struct tgn_garlic &, unsigned char *, unsigned char *);
+		void remove(struct tgn_garlic &);
+		bool exists(struct tgn_garlic);
+		void add(struct tgn_garlic);
+};
 /**
 *	tgnstorage - Пространство имен модуля storage. C помощью
 *	него происходит управление модулем storage.
@@ -112,6 +124,7 @@ class _routes {
 *	@clients - Объект управления структуры клиентов.
 *	@db - Объект управления базой данных.
 *	@routes - Объект управления структурой маршрутов.
+*	@garlic - Объект управления сткруктурой статусов сообщений.
 *	@clients - Объект управления структуры нод.
 *	@tasks - Объект управления заданиями.
 */
@@ -119,6 +132,7 @@ namespace tgnstorage {
 	inline _neighbors	neighbors;
 	inline _clients		clients;
 	inline _routes		routes;
+	inline _garlic		garlic;
 	inline _nodes		nodes;
 	inline _tasks		tasks;
 	inline _database	db;

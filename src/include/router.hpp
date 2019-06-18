@@ -18,14 +18,14 @@
 */
 class _router {
 	private :
-		void new_msg(struct tgn_ipport, tgnmsg &, unsigned char *);
+		void new_msg(struct tgn_ipport, tgnmsg &, unsigned char *, int);
+		unsigned char *g_back(struct tgn_garlic, enum tgn_status, int);
 		void from_neighbors(unsigned char *);
-		void from_clients(unsigned char *);
+		bool from_clients(unsigned char *);
 		void make_find(unsigned char *);
 
 	public :
-		unsigned char *c_status_garlic(tgnmsg &, struct sockaddr_in &);
-		unsigned char *n_status_garlic(tgnmsg &, struct sockaddr_in &);
+		unsigned char *status_garlic(tgnmsg &, struct sockaddr_in &);
 		unsigned char *client_garlic(tgnmsg &, struct sockaddr_in &);
 		unsigned char *node_garlic(tgnmsg &, struct sockaddr_in &);
 
