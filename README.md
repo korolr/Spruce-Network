@@ -1,5 +1,5 @@
 <p align="center">
-![logo](https://github.com/mrrva/media/blob/master/github_logo.png "The Garlic Network")
+<img src="https://github.com/mrrva/media/blob/master/github_logo.png">
 </p>
 
 This project is an open-source, decentralized, peer-to-peer network. This is a server-side component for Linux-based systems.
