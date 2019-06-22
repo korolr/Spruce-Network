@@ -107,6 +107,8 @@ class _routes {
 
 class _garlic {
 	private :
+		void task_error(struct tgn_garlic, struct tgn_client);
+
 		std::mutex mute;
 
 	public :
@@ -115,6 +117,7 @@ class _garlic {
 		void remove(struct tgn_garlic &);
 		bool exists(struct tgn_garlic);
 		void add(struct tgn_garlic);
+		void autoremove(void);
 };
 /**
 *	tgnstorage - Пространство имен модуля storage. C помощью

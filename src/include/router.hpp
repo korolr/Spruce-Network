@@ -19,7 +19,6 @@
 class _router {
 	private :
 		void new_msg(struct tgn_ipport, tgnmsg &, unsigned char *, int);
-		unsigned char *g_back(struct tgn_garlic, enum tgn_status, int);
 		void from_neighbors(unsigned char *);
 		bool from_clients(unsigned char *);
 		void make_find(unsigned char *);
@@ -50,6 +49,7 @@ inline _router router;
 *	@node - Функция обработки маршрутов для нод сети.
 */
 namespace tgnrouter {
+	unsigned char *garlic_back(struct tgn_garlic, enum tgn_status, int);
 	unsigned char *client(tgnmsg, struct sockaddr_in);
 	unsigned char *node(tgnmsg, struct sockaddr_in);
 }

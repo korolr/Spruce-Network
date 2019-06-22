@@ -161,3 +161,65 @@ bool _garlic::exists(struct tgn_garlic one)
 	this->mute.unlock();
 	return status;
 }
+/**
+*	_garlic::autoremove - Автоматическое вычищение
+*	ненужных статусов сообщений и отправка ошибок
+*	доставки.
+*/
+void _garlic::autoremove(void)
+{
+	using tgnstorage::clients;
+	using tgnstorage::routes;
+	using tgnstruct::garlic;
+
+	vector<struct tgn_garlic>::iterator it;
+	time_point<system_clock> clock;
+	struct tgn_client client;
+
+	if (garlic.size() == 0)
+		return;
+
+	clock = system_clock::now();
+	this->mute.lock();
+	it = garlic.begin();
+
+	for (; it != garlic.end(); it++) {
+		if (clock - (*it).ping < 50s)
+			continue;
+
+		if (clients.find(client, (*it).from))
+			this->task_error((*it), client);
+
+		routes.remove_hash((*it).to);
+		garlic.erase(it);
+	}
+
+	this->mute.unlock();
+}
+/**
+*	_garlic::task_error - Новое задание отправки
+*	ошибки доставки сообщения клиенту.
+*
+*	@req - Структура статуса доставки.
+*	@client - Структура клиента сети.
+*/
+void _garlic::task_error(struct tgn_garlic req,
+	struct tgn_client client)
+{
+	using tgnrouter::garlic_back;
+
+	struct tgn_ipport ipp;
+	struct tgn_task task;
+	unsigned char *bytes;
+
+	bytes = garlic_back(req, ERROR_ROUTE, 0);
+	memcpy(task.bytes, bytes, HEADERSIZE);
+	ipp = client.ipport;
+
+	task.client_in = saddr_get(ipp.ip, ipp.port);
+	task.length = HEADERSIZE;
+	task.target_only = true;
+
+	tgnstorage::tasks.add(task);
+	delete[] bytes;
+}

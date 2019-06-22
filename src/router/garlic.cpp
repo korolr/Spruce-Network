@@ -19,6 +19,7 @@ using namespace std;
 unsigned char *_router::client_garlic(tgnmsg &msg,
 	struct sockaddr_in &skddr)
 {
+	using tgnrouter::garlic_back;
 	using tgnstorage::routes;
 
 	unsigned char *resp, *key = msg.byte_key();
@@ -42,14 +43,14 @@ unsigned char *_router::client_garlic(tgnmsg &msg,
 	}
 
 	if (!routes.find(route, req.to)) {
-		resp = this->g_back(req, REQUEST_FIND, 0);
+		resp = garlic_back(req, REQUEST_FIND, 0);
 		this->make_find(req.to);
 
 		delete[] key;
 		return resp;
 	}
 
-	resp = this->g_back(req, GOOD_SERVER, 0);
+	resp = garlic_back(req, GOOD_SERVER, 0);
 	this->new_msg(route.ipport, msg, key, 0);
 
 	if (local == false) {
@@ -58,7 +59,7 @@ unsigned char *_router::client_garlic(tgnmsg &msg,
 		return resp;
 	}
 
-	local_m = this->g_back(req, GOOD_TARGET, 0);
+	local_m = garlic_back(req, GOOD_TARGET, 0);
 	memcpy(task.bytes, local_m, HEADERSIZE);
 
 	task.client_in = saddr_get(route.ipport.ip, PORT);
@@ -81,6 +82,7 @@ unsigned char *_router::client_garlic(tgnmsg &msg,
 unsigned char *_router::node_garlic(tgnmsg &msg,
 	struct sockaddr_in &skddr)
 {
+	using tgnrouter::garlic_back;
 	using tgnstorage::clients;
 
 	struct tgn_garlic req = msg.info_garlic();
@@ -90,14 +92,14 @@ unsigned char *_router::node_garlic(tgnmsg &msg,
 
 	if (!clients.find(client, req.to)) {
 		delete[] key;
-		return this->g_back(req, ERROR_TARGET, 1);
+		return garlic_back(req, ERROR_TARGET, 1);
 	}
 
 	this->new_msg(client.ipport, msg, nullptr, 1);
 	tgnstorage::routes.add(key, ipp, false);
 
 	delete[] key;
-	return this->g_back(req, GOOD_TARGET, 1);
+	return garlic_back(req, GOOD_TARGET, 1);
 }
 /**
 *	_router::status_garlic - Функция отправки статуса
@@ -109,6 +111,7 @@ unsigned char *_router::node_garlic(tgnmsg &msg,
 unsigned char *_router::status_garlic(tgnmsg &msg,
 	struct sockaddr_in &skddr)
 {
+	using tgnrouter::garlic_back;
 	using tgnstorage::clients;
 	using tgnstorage::routes;
 	using tgnstorage::tasks;
@@ -143,13 +146,13 @@ unsigned char *_router::status_garlic(tgnmsg &msg,
 
 	switch (req.status) {
 	case GOOD_TARGET:
-		resp = g_back(req, GOOD_TARGET, 0);
+		resp = garlic_back(req, GOOD_TARGET, 0);
 		memcpy(task.bytes, resp, HEADERSIZE);
 		tasks.add(task);
 		break;
 
 	case ERROR_TARGET:
-		resp = g_back(req, ERROR_TARGET, 0);
+		resp = garlic_back(req, ERROR_TARGET, 0);
 		memcpy(task.bytes, resp, HEADERSIZE);
 		routes.remove_hash(req.to);
 		tasks.add(task);
@@ -161,30 +164,6 @@ unsigned char *_router::status_garlic(tgnmsg &msg,
 	}
 
 	return nullptr;
-}
-/**
-*	_router::g_back - Функция формирования ответа на
-*	запрос garlic.
-*
-*	@garlic - Структура информации о сообщении.
-*	@s - Статус ответа сообщения.
-*	@type - Тип получателя.
-*/
-unsigned char *_router::g_back(struct tgn_garlic garlic,
-	enum tgn_status s, int type)
-{
-	unsigned char status = static_cast<unsigned char>(s);
-	unsigned char *msg, *s_ptr;
-
-	msg = msg_tmp<true>((type == 0) ? U_RESPONSE_GARLIC
-		: S_RESPONSE_GARLIC);
-	s_ptr = msg + HASHSIZE + 1;
-
-	memcpy(s_ptr + HASHSIZE, garlic.to, HASHSIZE);
-	memset(s_ptr + HASHSIZE + 1, status, 1);
-	memcpy(s_ptr, garlic.from, HASHSIZE);
-
-	return msg;
 }
 /**
 *	_router::make_find - Функция создания запросов к

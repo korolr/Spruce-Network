@@ -111,3 +111,27 @@ unsigned char *tgnrouter::node(tgnmsg msg,
 
 	return resp;
 }
+/**
+*	tgnrouter::garlic_back - Функция формирования ответа на
+*	запрос garlic.
+*
+*	@d - Структура информации о сообщении.
+*	@s - Статус ответа сообщения.
+*	@type - Тип получателя.
+*/
+unsigned char *tgnrouter::garlic_back(struct tgn_garlic d,
+	enum tgn_status s, int type)
+{
+	unsigned char status = static_cast<unsigned char>(s);
+	unsigned char *msg, *s_ptr;
+
+	msg = msg_tmp<true>((type == 0) ? U_RESPONSE_GARLIC
+		: S_RESPONSE_GARLIC);
+	s_ptr = msg + HASHSIZE + 1;
+
+	memcpy(s_ptr + HASHSIZE, d.to, HASHSIZE);
+	memset(s_ptr + HASHSIZE + 1, status, 1);
+	memcpy(s_ptr, d.from, HASHSIZE);
+
+	return msg;
+}
