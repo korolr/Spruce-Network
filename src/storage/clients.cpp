@@ -39,10 +39,10 @@ void _clients::update(unsigned char *hash,
 	this->mute.unlock();
 }
 /**
-*	_clients::remove - Удаление пользователей, которые
-*	не посылали запросы дольше 6 секунд.
+*	_clients::autoremove - Удаление пользователей,
+*	которые не посылали запросы дольше 6 секунд.
 */
-void _clients::remove(void)
+void _clients::autoremove(void)
 {
 	using tgnstruct::clients;
 

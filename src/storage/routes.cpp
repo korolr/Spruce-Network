@@ -59,10 +59,10 @@ size_t _routes::exists(unsigned char *hash)
 	return status;
 }
 /**
-*	_routes::remove - Удаление всех неактивных
+*	_routes::autoremove - Удаление всех неактивных
 *	записей из общего списка.
 */
-void _routes::remove(void)
+void _routes::autoremove(void)
 {
 	using chrono::system_clock;
 	using chrono::time_point;

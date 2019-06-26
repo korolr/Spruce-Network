@@ -18,4 +18,4 @@ test:
 	$(CC) $(ROUTER) $(NETWORK) $(STORAGE) $(OTHER) src/test/main.cpp -o test $(CFLAGS)
 
 clear:
-	rm -f *.o garlicd test
+	rm -f garlicd test

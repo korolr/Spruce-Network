@@ -56,6 +56,7 @@ class _nodes {
 		void ping(struct sockaddr_in &);
 		bool add(struct tgn_node);
 		void remove(std::string);
+		void autocheck(void);
 		void select(void);
 };
 
@@ -67,7 +68,7 @@ class _clients {
 		void update(unsigned char *, struct tgn_ipport &);
 		bool find(struct tgn_client &, unsigned char *);
 		bool exists(unsigned char *);
-		void remove(void);
+		void autoremove(void);
 };
 
 class _tasks {
@@ -81,6 +82,8 @@ class _tasks {
 
 class _neighbors {
 	private :
+		void new_requests(void);
+
 		std::mutex mute;
 
 	public :
@@ -89,6 +92,7 @@ class _neighbors {
 		std::vector<time_list> timelist(void);
 		bool exists(unsigned char *);
 		void clear(unsigned char *);
+		void autocheck(void);
 };
 
 class _routes {
@@ -102,7 +106,7 @@ class _routes {
 		void add(unsigned char *, std::string);
 		void remove_hash(unsigned char *);
 		size_t exists(unsigned char *);
-		void remove(void);
+		void autoremove(void);
 };
 
 class _garlic {

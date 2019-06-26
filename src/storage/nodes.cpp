@@ -175,4 +175,48 @@ struct tgn_node _nodes::get_last(void)
 	this->mute.unlock();
 	return node;
 }
+/**
+*	_neighbors::autocheck - Автоматическая проверка
+*	актуальности списка нод.
+*/
+void _nodes::autocheck(void)
+{
+	using tgnstorage::nodes;
 
+	time_point<system_clock> clock;
+	unsigned char *buffer;
+	struct tgn_task task;
+	struct tgn_node lst;
+
+	if (tgnstruct::nodes.size() == 0)
+		return;
+
+	clock = system_clock::now();
+	this->mute.lock();
+
+	if (tgnstruct::nodes.size() > MIN_NODES) {
+		for (auto &p : tgnstruct::nodes) {
+			if (tgnstruct::nodes.size() < 5)
+				break;
+
+			if (clock - p.ping > 43200s)
+				nodes.remove(p.ip);
+		}
+
+		this->mute.unlock();
+		return;
+	}
+
+	buffer = msg_tmp<true>(S_REQUEST_NODES);
+	memcpy(task.bytes, buffer, HEADERSIZE);
+	lst = this->get_last();
+
+	task.client_in = saddr_get(lst.ip, PORT);
+	task.target_only = false;
+	task.length = HEADERSIZE;
+
+	tgnstorage::tasks.add(task);
+
+	delete[] buffer;
+	this->mute.unlock();
+}

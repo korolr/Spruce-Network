@@ -142,3 +142,76 @@ vector<time_list> _neighbors::timelist(void)
 
 	return list;
 }
+/**
+*	_neighbors::new_requests - Составление новых запросов
+*	на получение актуального списка соседей.
+*/
+void _neighbors::new_requests(void)
+{
+	using tgnstorage::tasks;
+
+	unsigned char *buffer;
+	struct tgn_task task;
+
+	for (auto &p : tgnstruct::nodes) {
+		buffer = msg_tmp<true>(S_REQUEST_CLIENTS);
+		memcpy(task.bytes, buffer, HEADERSIZE);
+
+		task.client_in = saddr_get(p.ip, PORT);
+		task.length = HEADERSIZE;
+		task.target_only = true;
+
+		tasks.add(task);
+		delete[] buffer;
+	}
+}
+/**
+*	_neighbors::autocheck - Автоматическая проверка
+*	актуальности списка соседних клиентов.
+*/
+void _neighbors::autocheck(void)
+{
+	using tgnstorage::nodes;
+	using tgnstorage::tasks;
+
+	vector<time_list> list = this->timelist();
+	vector<time_list>::iterator it;
+	time_point<system_clock> clock;
+	unsigned char *buffer;
+	struct tgn_node node;
+	struct tgn_task task;
+
+	if (list.empty()) {
+		this->new_requests();
+		return;
+	}
+
+	clock = system_clock::now();
+	this->mute.lock();
+	it = list.begin();
+
+	for (; it != list.end(); it++) {
+		if (clock - (*it).second < 900s)
+			continue;
+
+		buffer = msg_tmp<true>(S_REQUEST_CLIENTS);
+
+		if (!nodes.find_hash(node, (*it).first)) {
+			this->clear((*it).first);
+			delete[] (*it).first;
+			delete[] buffer;
+			continue;
+		}
+
+		task.client_in = saddr_get(node.ip, PORT);
+		memcpy(task.bytes, buffer, HEADERSIZE);
+		task.length = HEADERSIZE;
+		task.target_only = true;
+
+		tasks.add(task);
+		delete[] (*it).first;
+		delete[] buffer;
+	}
+
+	this->mute.unlock();
+}
