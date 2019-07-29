@@ -143,7 +143,7 @@ size_t tgnmsg::length_detect(unsigned char *buffer)
 	if (buffer[0] == 0x05 || buffer[0] == 0x06
 		|| buffer[0] >= 0x17)
 		return FULLSIZE;
-	return HASHSIZE;
+	return HEADERSIZE;
 }
 /**
 *	tgnmsg::operator = - Оператор присвоения объекта.
