@@ -52,8 +52,8 @@ unsigned char *tgnmsg::to_bytes(size_t &len)
 	if (this->bytes[0] == 0x00)
 		return nullptr;
 
-	temp = new unsigned char[HASHSIZE];
-	memcpy(temp, this->bytes, TEXTSIZE);
+	temp = new unsigned char[FULLSIZE];
+	memcpy(temp, this->bytes, FULLSIZE);
 	len = this->length;
 
 	return temp;
