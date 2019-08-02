@@ -173,7 +173,7 @@ unsigned char *tgnmsg::garlic_msg(void)
 {
 	unsigned char *temp;
 
-	if (this->length == FULLSIZE
+	if (this->length != FULLSIZE
 		|| this->bytes[0] == 0x00)
 		return nullptr;
 
