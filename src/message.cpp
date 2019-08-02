@@ -315,7 +315,7 @@ struct tgn_find_req tgnmsg::info_find(void)
 struct tgn_garlic tgnmsg::info_garlic(void)
 {
 	unsigned char *s_ptr = this->bytes + HASHSIZE + 1;
-	unsigned char st = *(s_ptr + HASHSIZE + 1);
+	unsigned char st = *(s_ptr + HASHSIZE * 2);
 	struct tgn_garlic req;
 
 	if (bytes_sum<INFOSIZE>(s_ptr) == 0x00
