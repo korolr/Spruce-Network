@@ -34,10 +34,10 @@ int main()
 
 	tgnstorage::nodes.select();
 
-	if (tgnstruct::nodes.size() == 0) {
+	/*if (tgnstruct::nodes.size() == 0) {
 		std::cout << "[E] Node list is empty.\n";
 		return 1;
-	}
+	}*/
 
 	if (!tgnnetwork::socket.start()) {
 		std::cout << "[E] socket.start.\n";

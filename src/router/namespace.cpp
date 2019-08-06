@@ -34,7 +34,12 @@ unsigned char *tgnrouter::client(tgnmsg msg,
 		break;
 
 	case U_REQUEST_GARLIC:
+		cout << "GARLICCCCC\n";
 		resp = router.client_garlic(msg, skddr);
+		break;
+
+	case U_REQUEST_PING:
+		resp = msg_tmp<true>(U_RESPONSE_PING);
 		break;
 
 	default:
@@ -130,7 +135,7 @@ unsigned char *tgnrouter::garlic_back(struct tgn_garlic d,
 	s_ptr = msg + HASHSIZE + 1;
 
 	memcpy(s_ptr + HASHSIZE, d.to, HASHSIZE);
-	memset(s_ptr + HASHSIZE + 1, status, 1);
+	memcpy(s_ptr + HASHSIZE * 2, &status, 1);
 	memcpy(s_ptr, d.from, HASHSIZE);
 
 	return msg;
