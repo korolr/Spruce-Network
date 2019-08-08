@@ -19,13 +19,19 @@ using namespace std;
 bool _nodes::find_ip(struct tgn_node &f_node,
 	string ip)
 {
+	bool status = false;
+
+	this->mute.lock();
+
 	for (auto &p : tgnstruct::nodes)
 		if (p.ip == ip) {
 			f_node = p;
-			return true;
+			status = true;
+			break;
 		}
 
-	return false;
+	this->mute.unlock();
+	return status;
 }
 /**
 *	_nodes::find_hash - Нахождение ноды сети по hash
@@ -37,13 +43,19 @@ bool _nodes::find_ip(struct tgn_node &f_node,
 bool _nodes::find_hash(struct tgn_node &f_node,
 	unsigned char *hash)
 {
+	bool status = false;
+
+	this->mute.lock();
+
 	for (auto &p : tgnstruct::nodes)
 		if (memcmp(p.hash, hash, HASHSIZE)) {
 			f_node = p;
-			return true;
+			status = true;
+			break;
 		}
 
-	return false;
+	this->mute.unlock();
+	return status;
 }
 /**
 *	_nodes::ping - Обновление время использования
@@ -82,10 +94,13 @@ void _nodes::remove(string ip)
 
 	vector<struct tgn_node>::iterator it;
 
-	if (ip.length() < 5 || nodes.empty())
-		return;
-
 	this->mute.lock();
+
+	if (ip.length() < 5 || nodes.empty()) {
+		this->mute.unlock();
+		return;
+	}
+
 	it = nodes.begin();
 
 	for (; it != nodes.end(); it++)
@@ -108,13 +123,16 @@ bool _nodes::add(struct tgn_node node)
 	using tgnstruct::nodes;
 
 	string pub_key = bin2hex<HASHSIZE>(node.hash);
-	auto it = nodes.begin();
-
-	for (; it != nodes.end(); it++)
-		if ((*it).ip == node.ip)
-			return false;
+	vector<struct tgn_node>::iterator it;
 
 	this->mute.lock();
+	it = nodes.begin();
+
+	for (; it != nodes.end(); it++)
+		if ((*it).ip == node.ip) {
+			this->mute.unlock();
+			return false;
+		}
 
 	tgnstorage::db.new_node(node.ip, pub_key);
 	node.ping = chrono::system_clock::now();
@@ -164,15 +182,12 @@ struct tgn_node _nodes::get_last(void)
 	auto last_t = chrono::system_clock::now();
 	struct tgn_node node;
 
-	this->mute.lock();
-
 	for (auto &p : tgnstruct::nodes)
 		if (last_t > p.ping) {
 			last_t = p.ping;
 			node = p;
 		}
 
-	this->mute.unlock();
 	return node;
 }
 /**
@@ -188,27 +203,39 @@ void _nodes::autocheck(void)
 	struct tgn_task task;
 	struct tgn_node lst;
 
-	if (tgnstruct::nodes.size() == 0)
+	this->mute.lock();
+
+	if (tgnstruct::nodes.size() == 0) {
+		this->mute.unlock();
 		return;
+	}
 
 	clock = system_clock::now();
-	this->mute.lock();
 
 	if (tgnstruct::nodes.size() > MIN_NODES) {
 		for (auto &p : tgnstruct::nodes) {
 			if (tgnstruct::nodes.size() < 5)
 				break;
 
-			if (clock - p.ping > 43200s)
+			if (clock - p.ping > 43200s) {
+				this->mute.unlock();
 				nodes.remove(p.ip);
+				return;
+			}
 		}
 
 		this->mute.unlock();
 		return;
 	}
 
+	if (clock - this->last_req < 80s) {
+		this->mute.unlock();
+		return;
+	}
+
 	buffer = msg_tmp<true>(S_REQUEST_NODES);
 	memcpy(task.bytes, buffer, HEADERSIZE);
+	this->last_req = system_clock::now();
 	lst = this->get_last();
 
 	task.client_in = saddr_get(lst.ip, PORT);
@@ -216,7 +243,12 @@ void _nodes::autocheck(void)
 	task.length = HEADERSIZE;
 
 	tgnstorage::tasks.add(task);
-
+;
 	delete[] buffer;
 	this->mute.unlock();
+}
+
+_nodes::_nodes(void)
+{
+	this->last_req = system_clock::now();
 }

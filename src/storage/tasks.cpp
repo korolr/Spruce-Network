@@ -21,10 +21,13 @@ void _tasks::remove(vector<struct tgn_task>::iterator i)
 
 	vector<struct tgn_task>::iterator p;
 
-	if (tasks.empty())
-		return;
-
 	this->mute.lock();
+
+	if (tasks.empty()) {
+		this->mute.unlock();
+		return;
+	}
+
 	p = tasks.begin();
 
 	for (; p != tasks.end(); p++)
@@ -45,5 +48,14 @@ void _tasks::add(struct tgn_task task)
 {
 	this->mute.lock();
 	tgnstruct::tasks.push_back(task);
+	this->mute.unlock();
+}
+
+void _tasks::remove_first(void)
+{
+	using tgnstruct::tasks;
+
+	this->mute.lock();
+	tgnstruct::tasks.erase(tasks.begin());
 	this->mute.unlock();
 }

@@ -32,7 +32,7 @@ unsigned char *_router::client_garlic(tgnmsg &msg,
 		delete[] key;
 		return nullptr;
 	}
-cout << "Garlic.\n";
+
 	memcpy(req.from, key, HASHSIZE);
 
 	if (routes.exists(req.to) != 1) {
@@ -47,24 +47,17 @@ cout << "Garlic.\n";
 		return resp;
 	}
 
-	this->new_msg(route.ipport, msg, key, 0);
-
 	if (local == false) {
+		this->new_msg(route.ipport, msg, req.to, 1);
 		resp = garlic_back(req, GOOD_SERVER, 0);
 		tgnstorage::garlic.add(req);
 		delete[] key;
 		return resp;
 	}
 
+	this->new_msg(route.ipport, msg, req.to, 0);
 	resp = garlic_back(req, GOOD_TARGET, 0);
-	/*memcpy(task.bytes, local_m, HEADERSIZE);
 
-	task.client_in = saddr_get(route.ipport.ip, PORT);
-	task.length = HEADERSIZE;
-	task.target_only = true;
-	tgnstorage::tasks.add(task);*/
-
-	//delete[] local_m;
 	delete[] key;
 	return resp;
 }
@@ -83,18 +76,15 @@ unsigned char *_router::node_garlic(tgnmsg &msg,
 
 	struct tgn_garlic req = msg.info_garlic();
 	struct tgn_ipport ipp = ipport_get(skddr);
-	unsigned char *key = msg.byte_key();
 	struct tgn_client client;
 
 	if (!clients.find(client, req.to)) {
-		delete[] key;
 		return garlic_back(req, ERROR_TARGET, 1);
 	}
 
-	this->new_msg(client.ipport, msg, nullptr, 1);
-	tgnstorage::routes.add(key, ipp, false);
+	this->new_msg(client.ipport, msg, req.to, 0);
+	tgnstorage::routes.add(req.from, ipp, false);
 
-	delete[] key;
 	return garlic_back(req, GOOD_TARGET, 1);
 }
 /**
@@ -125,7 +115,7 @@ unsigned char *_router::status_garlic(tgnmsg &msg,
 		return nullptr;
 	}
 
-	if (!clients.find(client, req.from)) {
+	if (!clients.find(client, req.to)) {
 		tgnstorage::garlic.remove(req);
 
 		delete[] key;
@@ -142,6 +132,7 @@ unsigned char *_router::status_garlic(tgnmsg &msg,
 
 	switch (req.status) {
 	case GOOD_TARGET:
+		cout << "Good targer!!.\n";
 		resp = garlic_back(req, GOOD_TARGET, 0);
 		memcpy(task.bytes, resp, HEADERSIZE);
 		tasks.add(task);
@@ -159,6 +150,7 @@ unsigned char *_router::status_garlic(tgnmsg &msg,
 		break;
 	}
 
+	delete[] key;
 	return nullptr;
 }
 /**
@@ -180,9 +172,11 @@ void _router::make_find(unsigned char *hash)
 		return;
 
 	msg_b = msg_tmp<true>(S_REQUEST_FIND);
-	msg_b[HASHSIZE + 1] = 0x00;
 
-	memcpy(msg_b + HASHSIZE + 2, hash, HASHSIZE);
+	//msg_b[HASHSIZE + 1] = 0x00;
+	//memcpy(msg_b + HASHSIZE + 2, hash, HASHSIZE);
+
+	memcpy(msg_b + HASHSIZE + 1, hash, HASHSIZE);
 	memcpy(task.bytes, msg_b, HEADERSIZE);
 
 	routes.add(hash, ip, true);
@@ -203,13 +197,13 @@ void _router::make_find(unsigned char *hash)
 *
 *	@ipp - Структура данных ip & port.
 *	@msg - Структура сообщения.
-*	@from - Хэш отправителя.
+*	@to - Хэш получателя.
 *	@type - Тип получателя.
 */
 void _router::new_msg(struct tgn_ipport ipp,
-	tgnmsg &msg, unsigned char *from, int type)
+	tgnmsg &msg, unsigned char *to, int type)
 {
-	unsigned char *txt, *mb;
+	unsigned char *txt, *mb, *key;
 	struct tgn_task task;
 	size_t hs = HASHSIZE;
 	enum tgn_htype t;
@@ -221,17 +215,18 @@ void _router::new_msg(struct tgn_ipport ipp,
 
 	mb = msg_tmp<false>(t);
 	txt = msg.garlic_msg();
+	key = msg.byte_key();
 
-	if (from && from != nullptr) {
-		memcpy(mb + hs * 2 + 1, from, hs);
-	}
 	task.bytes[HASHSIZE * 3 + 1] = EMPTY_STATUS;
 	memcpy(mb + HEADERSIZE, txt, TEXTSIZE);
+	memcpy(mb + hs * 2 + 1, key, HASHSIZE);
+	memcpy(mb + hs + 1, to, HASHSIZE);
 	memcpy(task.bytes, mb, FULLSIZE);
 
 	tgnstorage::tasks.add(task);
 
 	delete[] txt;
+	delete[] key;
 	delete[] mb;
 }
 /**

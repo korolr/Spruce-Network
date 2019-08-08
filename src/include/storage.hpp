@@ -47,6 +47,7 @@ class _database {
 
 class _nodes {
 	private :
+		time_point<system_clock> last_req;
 		std::mutex mute;
 
 	public :
@@ -58,6 +59,7 @@ class _nodes {
 		void remove(std::string);
 		void autocheck(void);
 		void select(void);
+		_nodes(void);
 };
 
 class _clients {
@@ -78,12 +80,14 @@ class _tasks {
 	public :
 		void remove(std::vector<struct tgn_task>::iterator);
 		void add(struct tgn_task);
+		void remove_first(void);
 };
 
 class _neighbors {
 	private :
 		void new_requests(void);
 
+		time_point<system_clock> last_req;
 		std::mutex mute;
 
 	public :
@@ -93,6 +97,7 @@ class _neighbors {
 		bool exists(unsigned char *);
 		void clear(unsigned char *);
 		void autocheck(void);
+		_neighbors(void);
 };
 
 class _routes {

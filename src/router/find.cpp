@@ -35,7 +35,8 @@ unsigned char *_router::req_find(tgnmsg &msg,
 		msb = msg_tmp<true>(S_RESPONSE_FIND);
 		memcpy(msb + hs + 1, req.hash, hs);
 
-		if (req.from.length() < 6)
+		if (req.from.length() < 6
+			|| req.from == "0.0.0.0")
 			return msb;
 
 		memcpy(task.bytes, msb, HEADERSIZE);
@@ -53,7 +54,8 @@ unsigned char *_router::req_find(tgnmsg &msg,
 	msb = msg_tmp<true>(S_REQUEST_FIND);
 	ipport = ipport_get(skddr);
 
-	if (req.from.length() < 6) {
+	if (req.from.length() < 6
+		|| req.from == "0.0.0.0") {
 		tmp = iptobytes(ipport.ip);
 		memcpy(msb + hs * 2 + 5, tmp, 4);
 		delete[] tmp;

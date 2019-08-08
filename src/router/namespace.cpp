@@ -34,7 +34,6 @@ unsigned char *tgnrouter::client(tgnmsg msg,
 		break;
 
 	case U_REQUEST_GARLIC:
-		cout << "GARLICCCCC\n";
 		resp = router.client_garlic(msg, skddr);
 		break;
 

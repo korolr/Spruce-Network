@@ -139,7 +139,7 @@ void _socket::send_task(struct tgn_task &t)
 	u.sin_family = AF_INET;
 
 	do {
-		sendto(sok, t.bytes, t.length, 0x100, cl ,sz);
+		sendto(sok, t.bytes, t.length, 0x100, cl, sz);
 
 		if (i >= tgnstruct::nodes.size()) {
 			break;
@@ -162,7 +162,7 @@ void _socket::thread_send(void)
 		if (tasks.empty())
 			continue;
 
-		this->send_task(tasks[0]);
-		tgnstorage::tasks.remove(tasks.begin());
+		this->send_task(*tasks.begin());
+		tgnstorage::tasks.remove_first();
 	}
 }

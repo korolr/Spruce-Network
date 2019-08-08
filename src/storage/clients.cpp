@@ -48,11 +48,14 @@ void _clients::autoremove(void)
 
 	time_point<system_clock> time_now;
 
-	if (clients.empty())
+	this->mute.lock();
+
+	if (clients.empty()) {
+		this->mute.unlock();
 		return;
+	}
 
 	time_now = chrono::system_clock::now();
-	this->mute.lock();
 
 	for (size_t i = 0; i < clients.size(); i++)
 		if (time_now - clients[i].ping > 6s) 

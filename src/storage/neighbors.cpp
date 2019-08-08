@@ -125,6 +125,8 @@ vector<time_list> _neighbors::timelist(void)
 	unsigned char *key;
 	bool flag = false;
 
+	this->mute.lock();
+
 	for (auto &n : neighbors) {
 		for (auto &l : list)
 			if (memcmp(n.node, l.first, HASHSIZE) == 0) {
@@ -140,6 +142,7 @@ vector<time_list> _neighbors::timelist(void)
 		list.push_back(pair<uc *, time>(key, n.ping));
 	}
 
+	this->mute.unlock();
 	return list;
 }
 /**
@@ -150,8 +153,16 @@ void _neighbors::new_requests(void)
 {
 	using tgnstorage::tasks;
 
+	auto clock = system_clock::now();
 	unsigned char *buffer;
 	struct tgn_task task;
+
+	if (clock - this->last_req < 80s) {
+		return;
+	}
+
+	this->last_req = system_clock::now();
+	this->mute.lock();
 
 	for (auto &p : tgnstruct::nodes) {
 		buffer = msg_tmp<true>(S_REQUEST_CLIENTS);
@@ -164,6 +175,8 @@ void _neighbors::new_requests(void)
 		tasks.add(task);
 		delete[] buffer;
 	}
+
+	this->mute.unlock();
 }
 /**
 *	_neighbors::autocheck - Автоматическая проверка
@@ -181,13 +194,15 @@ void _neighbors::autocheck(void)
 	struct tgn_node node;
 	struct tgn_task task;
 
+	this->mute.lock();
+
 	if (list.empty()) {
+		this->mute.unlock();
 		this->new_requests();
 		return;
 	}
 
 	clock = system_clock::now();
-	this->mute.lock();
 	it = list.begin();
 
 	for (; it != list.end(); it++) {
@@ -214,4 +229,9 @@ void _neighbors::autocheck(void)
 	}
 
 	this->mute.unlock();
+}
+
+_neighbors::_neighbors(void)
+{
+	this->last_req = system_clock::now();
 }

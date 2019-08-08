@@ -51,7 +51,7 @@ void _requests::thr_client(tgnmsg msg,
 	if (msg.client_valid() == false) {
 		resp = msg_tmp<true>(U_RESPONSE_DOS);
 		this->socket_response(resp, skddr);
-cout << "False\n";
+
 		delete[] hash;
 		delete[] resp;
 		return;

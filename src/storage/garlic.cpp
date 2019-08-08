@@ -45,15 +45,17 @@ void _garlic::set_status(unsigned char *from,
 
 	int cmp_1, cmp_2;
 
-	if (!from || !to || s == EMPTY_STATUS
-		|| garlic.size() == 0)
-		return;
-
 	this->mute.lock();
 
+	if (!from || !to || s == EMPTY_STATUS
+		|| garlic.size() == 0) {
+		this->mute.unlock();
+		return;
+	}
+
 	for (auto &p : garlic) {
-		cmp_1 = memcmp(p.from, from, HASHSIZE);
-		cmp_2 = memcmp(p.to, to, HASHSIZE);
+		cmp_1 = memcmp(p.from, to, HASHSIZE);
+		cmp_2 = memcmp(p.to, from, HASHSIZE);
 
 		if (cmp_1 == 0 && cmp_2 == 0) {
 			p.ping = system_clock::now();
@@ -77,15 +79,18 @@ void _garlic::remove(struct tgn_garlic &one)
 	vector<struct tgn_garlic>::iterator it;
 	int cmp_1, cmp_2, hs = HASHSIZE;
 
-	if (garlic.size() == 0)
-		return;
-
 	this->mute.lock();
+
+	if (garlic.size() == 0) {
+		this->mute.unlock();
+		return;
+	}
+
 	it = garlic.begin();
 
 	for (; it != garlic.end(); it++) {
-		cmp_1 = memcmp((*it).from, one.from, hs);
-		cmp_2 = memcmp((*it).to, one.to, hs);
+		cmp_1 = memcmp((*it).from, one.to, hs);
+		cmp_2 = memcmp((*it).to, one.from, hs);
 
 		if (cmp_1 == 0 && cmp_2 == 0) {
 			garlic.erase(it);
@@ -111,10 +116,12 @@ bool _garlic::find(struct tgn_garlic &one,
 	bool status = false;
 	int cmp_1, cmp_2;
 
-	if (!from || !to || garlic.size() == 0)
-		return false;
-
 	this->mute.lock();
+
+	if (!from || !to || garlic.size() == 0) {
+		this->mute.unlock();
+		return false;
+	}
 
 	for (auto &p : garlic) {
 		cmp_1 = memcmp(p.from, from, HASHSIZE);
@@ -143,14 +150,16 @@ bool _garlic::exists(struct tgn_garlic one)
 	bool status = false;
 	int cmp_1, cmp_2;
 
-	if (garlic.size() == 0)
-		return false;
-
 	this->mute.lock();
 
+	if (garlic.size() == 0) {
+		this->mute.unlock();
+		return false;
+	}
+
 	for (auto &p : garlic) {
-		cmp_1 = memcmp(p.from, one.from, HASHSIZE);
-		cmp_2 = memcmp(p.to, one.to, HASHSIZE);
+		cmp_1 = memcmp(p.from, one.to, HASHSIZE);
+		cmp_2 = memcmp(p.to, one.from, HASHSIZE);
 
 		if (cmp_1 == 0 && cmp_2 == 0) {
 			status = true;
@@ -176,11 +185,14 @@ void _garlic::autoremove(void)
 	time_point<system_clock> clock;
 	struct tgn_client client;
 
-	if (garlic.size() == 0)
+	this->mute.lock();
+
+	if (garlic.size() == 0) {
+		this->mute.unlock();
 		return;
+	}
 
 	clock = system_clock::now();
-	this->mute.lock();
 	it = garlic.begin();
 
 	for (; it != garlic.end(); it++) {
@@ -221,5 +233,6 @@ void _garlic::task_error(struct tgn_garlic req,
 	task.target_only = true;
 
 	tgnstorage::tasks.add(task);
+
 	delete[] bytes;
 }

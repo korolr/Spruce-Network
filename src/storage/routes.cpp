@@ -71,11 +71,14 @@ void _routes::autoremove(void)
 	vector<struct tgn_route>::iterator it;
 	time_point<system_clock> time_now;
 
-	if (routes.empty())
+	this->mute.lock();
+
+	if (routes.empty()) {
+		this->mute.unlock();
 		return;
+	}
 
 	time_now = system_clock::now();
-	this->mute.lock();
 
 	for (it = routes.begin(); it != routes.end(); it++) {
 		if (time_now - (*it).ping > 25200s)
