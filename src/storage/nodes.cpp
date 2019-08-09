@@ -199,9 +199,6 @@ void _nodes::autocheck(void)
 	using tgnstorage::nodes;
 
 	time_point<system_clock> clock;
-	unsigned char *buffer;
-	struct tgn_task task;
-	struct tgn_node lst;
 
 	this->mute.lock();
 
@@ -233,6 +230,21 @@ void _nodes::autocheck(void)
 		return;
 	}
 
+	this->request_getlist();
+	this->mute.unlock();
+}
+/**
+*	_neighbors::request_getlist - Создание запроса
+*	на получение новых нод.
+*/
+void _nodes::request_getlist(void)
+{
+	unsigned char *buffer;
+	struct tgn_task task;
+	struct tgn_node lst;
+
+	this->last_req = system_clock::now();
+
 	buffer = msg_tmp<true>(S_REQUEST_NODES);
 	memcpy(task.bytes, buffer, HEADERSIZE);
 	this->last_req = system_clock::now();
@@ -243,11 +255,13 @@ void _nodes::autocheck(void)
 	task.length = HEADERSIZE;
 
 	tgnstorage::tasks.add(task);
-;
-	delete[] buffer;
-	this->mute.unlock();
-}
 
+	delete[] buffer;
+}
+/**
+*	_neighbors::_nodes - Устанавливает время последнего
+*	запроса на получения списка нод.
+*/
 _nodes::_nodes(void)
 {
 	this->last_req = system_clock::now();

@@ -68,17 +68,14 @@ void _neighbors::clear(unsigned char *hash)
 {
 	using tgnstruct::neighbors;
 
-	vector<struct tgn_neighbor>::iterator it;
-
 	if (!hash || hash == nullptr)
 		return;
 
 	this->mute.lock();
-	it = neighbors.begin();
 
-	for (; it != neighbors.end(); it++) {
-		if (memcmp((*it).node, hash, HASHSIZE) == 0)
-			neighbors.erase(it);
+	for (size_t i = 0; i < neighbors.size(); i++) {
+		if (memcmp(neighbors[i].node, hash, HASHSIZE) == 0)
+			neighbors.erase(neighbors.begin() + i);
 	}
 
 	this->mute.unlock();

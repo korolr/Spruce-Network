@@ -34,10 +34,12 @@ int main()
 
 	tgnstorage::nodes.select();
 
-	/*if (tgnstruct::nodes.size() == 0) {
-		std::cout << "[E] Node list is empty.\n";
+	if (tgnstruct::nodes.size() == 0) {
+		std::cout << "[E] Node list is empty. Please "
+			<< "download database with current list "
+			<< "of nodes.\n";
 		return 1;
-	}*/
+	}
 
 	if (!tgnnetwork::socket.start()) {
 		std::cout << "[E] socket.start.\n";

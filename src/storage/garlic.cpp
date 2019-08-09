@@ -180,7 +180,7 @@ void _garlic::autoremove(void)
 	using tgnstorage::clients;
 	using tgnstorage::routes;
 	using tgnstruct::garlic;
-
+/*
 	vector<struct tgn_garlic>::iterator it;
 	time_point<system_clock> clock;
 	struct tgn_client client;
@@ -204,6 +204,30 @@ void _garlic::autoremove(void)
 
 		routes.remove_hash((*it).to);
 		garlic.erase(it);
+		break;
+	}
+
+	this->mute.unlock();
+*/
+	auto clock = system_clock::now();
+	struct tgn_client client;
+
+	this->mute.lock();
+
+	if (garlic.size() == 0) {
+		this->mute.unlock();
+		return;
+	}
+
+	for (size_t i = 0; i < garlic.size(); i++) {
+		if (clock - garlic[i].ping < 50s)
+			continue;
+
+		if (clients.find(client, garlic[i].from))
+			this->task_error(garlic[i], client);
+
+		routes.remove_hash(garlic[i].to);
+		garlic.erase(garlic.begin() + i);
 	}
 
 	this->mute.unlock();

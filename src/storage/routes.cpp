@@ -130,7 +130,8 @@ bool _routes::find(struct tgn_route &route,
 	this->mute.lock();
 
 	for (auto &p : tgnstruct::routes) {
-		if (memcmp(hash, p.hash, HASHSIZE) == 0) {
+		if (memcmp(hash, p.hash, HASHSIZE) == 0
+			&& p.find == false) {
 			p.ping = chrono::system_clock::now();
 			status = true;
 			route = p;

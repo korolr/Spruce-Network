@@ -10,35 +10,6 @@
 */
 using namespace std;
 /**
-*	_nodes::remove - Удаление конкретного задания
-*	из общего списка заданий.
-*
-*	@i - Итератор задания.
-*/
-void _tasks::remove(vector<struct tgn_task>::iterator i)
-{
-	using tgnstruct::tasks;
-
-	vector<struct tgn_task>::iterator p;
-
-	this->mute.lock();
-
-	if (tasks.empty()) {
-		this->mute.unlock();
-		return;
-	}
-
-	p = tasks.begin();
-
-	for (; p != tasks.end(); p++)
-		if (p == i) {
-			tasks.erase(p);
-			break;
-		}
-
-	this->mute.unlock();
-}
-/**
 *	_nodes::add - Добавление нового задания в
 *	общий список заданий.
 *
@@ -50,7 +21,10 @@ void _tasks::add(struct tgn_task task)
 	tgnstruct::tasks.push_back(task);
 	this->mute.unlock();
 }
-
+/**
+*	_nodes::remove_first - Удаление первого
+*	задания из общего списка.
+*/
 void _tasks::remove_first(void)
 {
 	using tgnstruct::tasks;

@@ -55,6 +55,7 @@ class _nodes {
 		bool find_ip(struct tgn_node &, std::string);
 		struct tgn_node get_last(void);
 		void ping(struct sockaddr_in &);
+		void request_getlist(void);
 		bool add(struct tgn_node);
 		void remove(std::string);
 		void autocheck(void);
@@ -78,7 +79,6 @@ class _tasks {
 		std::mutex mute;
 
 	public :
-		void remove(std::vector<struct tgn_task>::iterator);
 		void add(struct tgn_task);
 		void remove_first(void);
 };
