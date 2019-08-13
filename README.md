@@ -8,11 +8,12 @@ This project is an open-source, decentralized, peer-to-peer network. This is a s
 This project finds other users and communicates with them for **building the whole virtual network**. In other words, that project makes a **private network inside the Internet**.
 
 ## Features:
-- **It is fully anonymous**: This project uses own implementation of garlic routing.
-- **It is fully decentralized**: Each node of this network is an independent router.
-- **It helps to send encrypted private packages** to any network's member.
-- **It has own protocol** of transporting on the application layer.
+- It is **fully anonymous**: This project uses own implementation of garlic routing.
+- It is **fully decentralized**: Each node of this network is an independent router.
+- It helps to **send encrypted private packages** to any network's member.
+- It has **own protocol** of transporting on the application layer.
 - It is not afraid of local authority censorship filters.
+- It is **automatically adapts and sets up**.
 
 ## What is it for?
 The Garlic Network is intended for engineers and enthusiasts looking to build a new safe project based on TGN.
