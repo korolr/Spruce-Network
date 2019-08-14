@@ -17,7 +17,7 @@ This project finds other users and communicates with them for **building the who
 
 ## Scheme:
 <p align="center">
-<img src="https://github.com/mrrva/media/blob/master/sc.png">
+<img src="https://github.com/mrrva/media/blob/master/sc1.png">
 </p>
 
 ## What is it for?
