@@ -1,19 +1,19 @@
 /**
-*	tasks.cpp - Модуль отвечающий за работу с
-*	структурой заданий сети TGN.
+*	tasks.cpp - The module responsible for work
+*	with job structure TGN network.
 *
 *	@mrrva - 2019
 */
 #include "../include/storage.hpp"
 /**
-*	Используемые пространства имен и объекты.
+*	Used namespaces and objects.
 */
 using namespace std;
 /**
-*	_nodes::add - Добавление нового задания в
-*	общий список заданий.
+*	_nodes::add - Add a new task to
+* 	general list of tasks.
 *
-*	@task - Структура нового задания.
+*	@task - Structure of the new task.
 */
 void _tasks::add(struct tgn_task task)
 {
@@ -22,8 +22,8 @@ void _tasks::add(struct tgn_task task)
 	this->mute.unlock();
 }
 /**
-*	_nodes::remove_first - Удаление первого
-*	задания из общего списка.
+*	_nodes::remove_first - Delete First
+* 	tasks from the general list.
 */
 void _tasks::remove_first(void)
 {
