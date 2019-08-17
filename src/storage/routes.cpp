@@ -51,7 +51,7 @@ size_t _routes::exists(unsigned char *hash)
 
 	for (auto &p : tgnstruct::routes)
 		if (memcmp(hash, p.hash, HASHSIZE) == 0) {
-			status = (!p.find) ? 2 : 1;
+			status = (p.find) ? 1 : 2;
 			break;
 		}
 
