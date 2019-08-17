@@ -35,7 +35,7 @@ unsigned char *_router::client_garlic(tgnmsg &msg,
 
 	memcpy(req.from, key, HASHSIZE);
 
-	if (routes.exists(req.to) != 1) {
+	if (routes.exists(req.to) != 2) {
 		local = this->from_clients(req.to);
 		this->from_neighbors(req.to);
 	}
