@@ -2,7 +2,7 @@
 <img src="https://github.com/mrrva/media/blob/master/github_logo.png">
 </p>
 
-This project is an open-source, decentralized, peer-to-peer network. This is a server-side component for Linux-based systems.
+This project is an open-source, decentralized, peer-to-peer network. This is a server-side component for Linux-based systems which builds network infrastructure.
 
 ## What does it do?
 This project finds other users and communicates with them for **building the whole virtual network**. In other words, that project makes a **private network inside the Internet**.
