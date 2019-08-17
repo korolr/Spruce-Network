@@ -133,9 +133,9 @@ unsigned char *tgnrouter::garlic_back(struct tgn_garlic d,
 		: S_RESPONSE_GARLIC);
 	s_ptr = msg + HASHSIZE + 1;
 
-	memcpy(s_ptr + HASHSIZE, d.to, HASHSIZE);
+	memcpy(s_ptr + HASHSIZE, d.from, HASHSIZE);
 	memcpy(s_ptr + HASHSIZE * 2, &status, 1);
-	memcpy(s_ptr, d.from, HASHSIZE);
+	memcpy(s_ptr, d.to, HASHSIZE);
 
 	return msg;
 }

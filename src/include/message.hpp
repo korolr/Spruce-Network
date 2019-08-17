@@ -35,6 +35,7 @@ class tgnmsg {
 		tgnmsg(unsigned char *bytes = nullptr);
 		struct tgn_find_req info_find(void);
 		struct tgn_garlic info_garlic(void);
+		void from_garlic(unsigned char *);
 		enum tgn_htype header_type(void);
 		unsigned char *to_bytes(size_t &);
 		unsigned char *garlic_msg(void);

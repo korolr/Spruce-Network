@@ -34,6 +34,7 @@ unsigned char *_router::client_garlic(tgnmsg &msg,
 	}
 
 	memcpy(req.from, key, HASHSIZE);
+	msg.from_garlic(key);
 
 	if (routes.exists(req.to) != 2) {
 		local = this->from_clients(req.to);
@@ -47,7 +48,7 @@ unsigned char *_router::client_garlic(tgnmsg &msg,
 		return resp;
 	}
 
-	if (local == false) {
+	if (!local) {
 		this->new_msg(route.ipport, msg, req.to, 1);
 		resp = garlic_back(req, GOOD_SERVER, 0);
 		tgnstorage::garlic.add(req);
@@ -108,14 +109,14 @@ unsigned char *_router::status_garlic(tgnmsg &msg,
 	struct tgn_client client;
 	struct tgn_task task;
 
-	if (memcmp(key, req.to, HASHSIZE) == 0
-		|| bytes_sum<HASHSIZE>(req.to) ==0
+	if (memcmp(key, req.from, HASHSIZE) == 0
+		|| bytes_sum<HASHSIZE>(req.from) ==0
 		|| !tgnstorage::garlic.exists(req)) {
 		delete[] key;
 		return nullptr;
 	}
 
-	if (!clients.find(client, req.to)) {
+	if (!clients.find(client, req.from)) {
 		tgnstorage::garlic.remove(req);
 
 		delete[] key;
@@ -132,7 +133,6 @@ unsigned char *_router::status_garlic(tgnmsg &msg,
 
 	switch (req.status) {
 	case GOOD_TARGET:
-		cout << "Good targer!!.\n";
 		resp = garlic_back(req, GOOD_TARGET, 0);
 		memcpy(task.bytes, resp, HEADERSIZE);
 		tasks.add(task);
@@ -173,9 +173,6 @@ void _router::make_find(unsigned char *hash)
 
 	msg_b = msg_tmp<true>(S_REQUEST_FIND);
 
-	//msg_b[HASHSIZE + 1] = 0x00;
-	//memcpy(msg_b + HASHSIZE + 2, hash, HASHSIZE);
-
 	memcpy(msg_b + HASHSIZE + 1, hash, HASHSIZE);
 	memcpy(task.bytes, msg_b, HEADERSIZE);
 
@@ -203,7 +200,8 @@ void _router::make_find(unsigned char *hash)
 void _router::new_msg(struct tgn_ipport ipp,
 	tgnmsg &msg, unsigned char *to, int type)
 {
-	unsigned char *txt, *mb, *key;
+	struct tgn_garlic info = msg.info_garlic();
+	unsigned char *txt, *mb;
 	struct tgn_task task;
 	size_t hs = HASHSIZE;
 	enum tgn_htype t;
@@ -215,18 +213,16 @@ void _router::new_msg(struct tgn_ipport ipp,
 
 	mb = msg_tmp<false>(t);
 	txt = msg.garlic_msg();
-	key = msg.byte_key();
 
 	task.bytes[HASHSIZE * 3 + 1] = EMPTY_STATUS;
+	memcpy(mb + hs * 2 + 1, info.from, HASHSIZE);
 	memcpy(mb + HEADERSIZE, txt, TEXTSIZE);
-	memcpy(mb + hs * 2 + 1, key, HASHSIZE);
 	memcpy(mb + hs + 1, to, HASHSIZE);
 	memcpy(task.bytes, mb, FULLSIZE);
 
 	tgnstorage::tasks.add(task);
 
 	delete[] txt;
-	delete[] key;
 	delete[] mb;
 }
 /**

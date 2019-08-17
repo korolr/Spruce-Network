@@ -319,12 +319,23 @@ struct tgn_garlic tgnmsg::info_garlic(void)
 	struct tgn_garlic req;
 
 	if (bytes_sum<INFOSIZE>(s_ptr) == 0x00
-		|| st > ERROR_TARGET)
+		|| st > ERROR_TARGET) {
 		return req;
+	}
 
 	req.status = static_cast<enum tgn_status>(st);
 	memcpy(req.from, s_ptr + HASHSIZE, HASHSIZE);
 	memcpy(req.to, s_ptr, HASHSIZE);
 
 	return req;
+}
+
+void tgnmsg::from_garlic(unsigned char *key)
+{
+	unsigned char *s_ptr = this->bytes + HASHSIZE + 1;
+
+	if (!key || key == nullptr)
+		return;
+
+	memcpy(s_ptr + HASHSIZE, key, HASHSIZE);
 }

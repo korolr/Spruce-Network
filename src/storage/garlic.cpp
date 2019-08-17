@@ -54,8 +54,8 @@ void _garlic::set_status(unsigned char *from,
 	}
 
 	for (auto &p : garlic) {
-		cmp_1 = memcmp(p.from, to, HASHSIZE);
-		cmp_2 = memcmp(p.to, from, HASHSIZE);
+		cmp_1 = memcmp(p.from, from, HASHSIZE);
+		cmp_2 = memcmp(p.to, to, HASHSIZE);
 
 		if (cmp_1 == 0 && cmp_2 == 0) {
 			p.ping = system_clock::now();
@@ -158,8 +158,8 @@ bool _garlic::exists(struct tgn_garlic one)
 	}
 
 	for (auto &p : garlic) {
-		cmp_1 = memcmp(p.from, one.to, HASHSIZE);
-		cmp_2 = memcmp(p.to, one.from, HASHSIZE);
+		cmp_1 = memcmp(p.from, one.from, HASHSIZE);
+		cmp_2 = memcmp(p.to, one.to, HASHSIZE);
 
 		if (cmp_1 == 0 && cmp_2 == 0) {
 			status = true;
