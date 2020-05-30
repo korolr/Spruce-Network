@@ -88,24 +88,29 @@ map<unsigned char *, string> database_handler::nodes(void) {
 	unsigned char *tmp;
 	string ip, hash;
 
+	auto to_str = [](const unsigned char *data) {
+		unsigned char *tmp;
+
+		assert(data);
+
+		tmp = const_cast<unsigned char *>(data);
+		return string(reinterpret_cast<char *>(tmp));
+	};
+
 	mute.lock();
 
-	sqlite3_prepare_v2(db, q.c_str(), -1, &rs, nullptr);
+	sqlite3_prepare_v2(db, q.c_str(), -1, &rs,
+					   nullptr);
 
 	while (sqlite3_step(rs) == SQLITE_ROW) {
-		tmp = const_cast<unsigned char *>(sqlite3_column_text(rs, 1));
-		hash = string(reinterpret_cast<char *>(tmp));
+		hash = to_str(sqlite3_column_text(rs, 1));
+		tmp	= hex2bin(HASHSIZE * 2, hash);
 
-		tmp = const_cast<unsigned char *>(sqlite3_column_text(rs, 0));
-		ip = string(reinterpret_cast<char *>(tmp));
+		ip = to_str(sqlite3_column_text(rs, 0));
 
-		tmp = hex2bin(HASHSIZE * 2, hash);
-
-		if (!tmp) {
-			continue;
+		if (tmp) {
+			list.insert(make_pair(tmp, ip));
 		}
-
-		list.insert(pair<unsigned char *, string>(tmp, ip));
 	}
 
 	mute.unlock();
