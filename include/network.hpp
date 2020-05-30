@@ -29,6 +29,7 @@ class udp_network {
 		atomic<bool> work = false;
 
 		void start(void);
+		udp_network(void);
 
 		~udp_network(void) {
 			if (!work) { return; }
