@@ -1,75 +1,66 @@
-/**
-*	router.cpp - Часть модуля маршрутизации в котором
-*	хранятся основные публичные функции модуля.
-*
-*	@mrrva - 2019
-*/
-#include "../include/router.hpp"
-/**
-*	Используемые пространства имен и объекты.
-*/
-using namespace std;
-/**
-*	_router::req_nodes - Функция обработки маршрутов
-*	для отправки списка нод.
-*
-*	@msg - Сообщение от клиента сети.
-*	@skddr - Структура sockaddr_in.
-*	@client - Сообщение от клиента.
-*/
-unsigned char *_router::req_nodes(tgnmsg &msg,
-	struct sockaddr_in &skddr, bool client)
-{
-	size_t i = 0, s, hs = HASHSIZE;
-	unsigned char *buff, *ip;
-	enum tgn_htype htype;
 
-	htype = (client) ? U_RESPONSE_NODES:
-		S_RESPONSE_NODES;
-	buff = msg_tmp<true>(htype);
+#include "../../include/network.hpp"
+/*********************************************************/
+struct ret nodes_router::req(struct sockaddr_in sddr,
+							 pack msg) {
+	size_t max = (UDP_PACK - HASHSIZE - 5) / (HASHSIZE + 4);
+	size_t tmp, size = max * (HASHSIZE + 4);
+	unsigned char buff[size], *ip;
+	pack res;
 
-	for (auto &p : tgnstruct::nodes) {
-		s = hs + 1 + (hs + 4) * i++;
+	memset(buff, 0x00, size);
+	storage::clients.mute.lock();
+	/**
+	*	Generation of a byte array in the format: host
+	*	hash, host ip address.
+	*/
+	for (auto p : structs::clients) {
+		if (!p.is_node) {
+			continue;
+		}
 
-		if (s >= HEADERSIZE)
-			break;
+		tmp = (max - 1) * (HASHSIZE + 4);
+		assert(ip = ip2bytes(p.ipp.ip));
 
-		ip = iptobytes(p.ip);
+		memcpy(buff + tmp, p.hash, HASHSIZE);
+		memcpy(buff + tmp + HASHSIZE, ip, 4);
 
-		if (ip == nullptr) {
-			tgnstorage::nodes.remove(p.ip);
+		delete[] ip;
+
+		if (max == 0) {
 			break;
 		}
 
-		memcpy(buff + s, p.hash, HASHSIZE);
-		memcpy(buff + s + HASHSIZE, ip, 4);
-		delete[] ip;
+		max--;
 	}
 
-	return buff;
+	storage::clients.mute.unlock();
+
+	res.tmp(NODE_RES_NODE, msg.cookie());
+	res.set_info(buff, size);
+
+	return handler::make_ret(sddr, msg.hash(), res);
 }
-/**
-*	_router::resp_nodes - Функция обработки маршрутов
-*	для получения списка нод.
-*
-*	@msg - Сообщение от клиента сети.
-*	@skddr - Структура sockaddr_in.
-*/
-unsigned char *_router::rsp_nodes(tgnmsg &msg,
-	struct sockaddr_in &skddr)
-{
-	map<unsigned char *, string> list;
-	struct tgn_node node;
+/*********************************************************/
+void nodes_router::res(struct sockaddr_in sddr, pack msg) {
+	size_t max = (UDP_PACK - HASHSIZE - 5) / (HASHSIZE + 4);
+	unsigned char hash[HASHSIZE], *info = msg.info();
+	size_t tmp;
+	string ip;
 
-	list = msg.info_nodes();
+	storage::tasks.rm_cookie(msg.cookie());
 
-	for (auto &p : list) {
-		node.ip = p.second;
-		memcpy(node.hash, p.first, HASHSIZE);
-		tgnstorage::nodes.add(node);
+	for (size_t i = 0; i < max; i++) {
+		tmp = (max - 1) * (HASHSIZE + 4);
 
-		delete[] p.first;
+		ip = bytes2ip(info + tmp + HASHSIZE);
+		memcpy(hash, info + tmp,   HASHSIZE);
+
+		if (is_null(hash, HASHSIZE) || ip.length() < 5) {
+			max--;
+			continue;
+		}
+
+		storage::nodes.add(hash, ip);
 	}
-
-	return nullptr;
 }

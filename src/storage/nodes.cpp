@@ -1,268 +1,179 @@
-/**
-*	nodes.cpp - Модуль отвечающий за работу с
-*	структурой нод сети TGN.
-*
-*	@mrrva - 2019
-*/
-#include "../include/storage.hpp"
-/**
-*	Используемые пространства имен и объекты.
-*/
-using namespace std;
-/**
-*	_nodes::find_ip - Нахождение ноды сети по ip
-*	адресу.
-*
-*	@f_node - Ссылка для записи адреса ноды.
-*	@ip - Ip адрес искомой ноды.
-*/
-bool _nodes::find_ip(struct tgn_node &f_node,
-	string ip)
-{
-	bool status = false;
 
-	this->mute.lock();
-
-	for (auto &p : tgnstruct::nodes)
-		if (p.ip == ip) {
-			f_node = p;
-			status = true;
-			break;
-		}
-
-	this->mute.unlock();
-	return status;
+#include "../../include/storage.hpp"
+/*********************************************************/
+nodes_handler::nodes_handler(void) {
+	ping = system_clock::now();
 }
-/**
-*	_nodes::find_hash - Нахождение ноды сети по hash
-*	ключу.
-*
-*	@f_node - Ссылка для записи адреса ноды.
-*	@hash - Hash искомой ноды.
-*/
-bool _nodes::find_hash(struct tgn_node &f_node,
-	unsigned char *hash)
-{
-	bool status = false;
+/*********************************************************/
+void nodes_handler::select(void) {
+	map<unsigned char *, string> list = storage::db.nodes();
+	struct client one;
 
-	this->mute.lock();
-
-	for (auto &p : tgnstruct::nodes)
-		if (memcmp(p.hash, hash, HASHSIZE)) {
-			f_node = p;
-			status = true;
-			break;
-		}
-
-	this->mute.unlock();
-	return status;
-}
-/**
-*	_nodes::ping - Обновление время использования
-*	ноды сети.
-*
-*	@skddr - Структура sockaddr_in ноды.
-*/
-void _nodes::ping(struct sockaddr_in &skddr)
-{
-	struct tgn_ipport ipport = ipport_get(skddr);
-	struct tgn_node node;
-
-	if (ipport.ip.length() < 5 || 
-		ipport.port != PORT)
-		return;
-
-	if (!this->find_ip(node, ipport.ip))
-		return;
-
-	this->mute.lock();
-
-	node.ping = chrono::system_clock::now();
-	tgnstorage::db.ping_node(ipport.ip);
-
-	this->mute.unlock();
-}
-/**
-*	_nodes::remove - Удаление ноды из структуры
-*	и базы данных.
-*
-*	@ip - Ip адрес ноды.
-*/
-void _nodes::remove(string ip)
-{
-	using tgnstruct::nodes;
-
-	vector<struct tgn_node>::iterator it;
-
-	this->mute.lock();
-
-	if (ip.length() < 5 || nodes.empty()) {
-		this->mute.unlock();
-		return;
-	}
-
-	it = nodes.begin();
-
-	for (; it != nodes.end(); it++)
-		if ((*it).ip == ip) {
-			tgnstorage::db.remove_node((*it).ip);
-			nodes.erase(it);
-			break;
-		}
-
-	this->mute.unlock();
-}
-/**
-*	_nodes::add - Добавление новой ноды в общий список
-*	и в базу данных.
-*
-*	@node - Структура данных ноды.
-*/
-bool _nodes::add(struct tgn_node node)
-{
-	using tgnstruct::nodes;
-
-	string pub_key = bin2hex<HASHSIZE>(node.hash);
-	vector<struct tgn_node>::iterator it;
-
-	this->mute.lock();
-	it = nodes.begin();
-
-	for (; it != nodes.end(); it++)
-		if ((*it).ip == node.ip) {
-			this->mute.unlock();
-			return false;
-		}
-
-	tgnstorage::db.new_node(node.ip, pub_key);
-	node.ping = chrono::system_clock::now();
-	nodes.push_back(node);
-
-	this->mute.unlock();
-	return true;
-}
-/**
-*	_nodes::select - Извлечение всех нод из базы данных
-*	и заполнение списка нод.
-*/
-void _nodes::select(void)
-{
-	const short len = HASHSIZE * 2;
-	map<string, string> list;
-	struct tgn_node node;
-	unsigned char *hash;
-
-	list = tgnstorage::db.select_nodes();
-
-	if (list.empty())
-		return;
-
-	this->mute.lock();
+	mute.lock();
 
 	for (auto &p : list) {
-		node.ping = chrono::system_clock::now();
-		hash = hex2bin<len>(p.second);
-		memcpy(node.hash, hash, HASHSIZE);
-		node.ip = p.first;
+		assert(p.first);
 
-		if (hash != nullptr) {
-			tgnstruct::nodes.push_back(node);
-			delete[] hash;
-		}
+		memcpy(one.hash, p.first, HASHSIZE);
+		one.ipp.ip = p.second;
+		one.ipp.port = UDP_PORT;
+		delete[] p.first;
+
+		structs::nodes.push_back(one);
 	}
 
-	this->mute.unlock();
-}
-/**
-*	_nodes::get_last - Получение ноды которую дольше
-*	всего не использовали.
-*/
-struct tgn_node _nodes::get_last(void)
-{
-	auto last_t = chrono::system_clock::now();
-	struct tgn_node node;
+	mute.unlock();
 
-	for (auto &p : tgnstruct::nodes)
-		if (last_t > p.ping) {
-			last_t = p.ping;
-			node = p;
+	if (list.size() == 0) {
+		cout << "[E]: Node list is empty.\n";
+		exit(1);
+	}
+}
+/*********************************************************/
+void nodes_handler::temporary_father(void) {
+	using storage::father;
+	using structs::keys;
+
+	struct client dad;
+
+	mute.lock();
+
+	if (structs::nodes.size() == 0) {
+		cout << "[E]: Node list is empty.\n";
+		exit(1);
+	}
+
+	dad = structs::nodes[0];
+
+	for (auto &p : structs::nodes) {
+		if (father.cmp(keys.pub, dad.hash, p.hash) == 1) {
+			continue;
 		}
 
-	return node;
+		dad = p;
+	}
+
+	mute.unlock();
+	storage::father.set(dad);
 }
-/**
-*	_neighbors::autocheck - Автоматическая проверка
-*	актуальности списка нод.
-*/
-void _nodes::autocheck(void)
-{
-	using tgnstorage::nodes;
+/*********************************************************/
+void nodes_handler::rm_hash(unsigned char *hash) {
+	vector<struct client>::iterator it;
+	string ip;
 
-	time_point<system_clock> clock;
+	assert(hash);
 
-	this->mute.lock();
+	mute.lock();
+	it = structs::nodes.begin();
 
-	if (tgnstruct::nodes.size() == 0) {
-		this->mute.unlock();
+	for (; it != structs::nodes.end(); it++) {
+		if (memcmp((*it).hash, hash, HASHSIZE) != 0) {
+			continue;
+		}
+
+		ip = (*it).ipp.ip;
+		structs::nodes.erase(it);
+		break;
+	}
+
+	mute.unlock();
+	storage::db.rm_node(ip);
+}
+/*********************************************************/
+void nodes_handler::add(unsigned char *hash, string ip) {
+	struct client one;
+
+	assert(hash && ip.length() > 5);
+	mute.lock();
+
+	if (structs::nodes.size() >= NODE_LIMIT) {
+		mute.unlock();
 		return;
 	}
 
-	clock = system_clock::now();
+	for (auto p : structs::nodes) {
+		if (memcmp(hash, p.hash, HASHSIZE) == 0) {
+			mute.unlock();
+			return;
+		}
+	}
 
-	if (tgnstruct::nodes.size() > MIN_NODES) {
-		for (auto &p : tgnstruct::nodes) {
-			if (tgnstruct::nodes.size() < 5)
-				break;
+	memcpy(one.hash, hash, HASHSIZE);
+	one.ipp = { UDP_PORT, ip };
 
-			if (clock - p.ping > 43200s) {
-				this->mute.unlock();
-				nodes.remove(p.ip);
-				return;
-			}
+	structs::nodes.push_back(one);
+	mute.unlock();
+
+	storage::db.rm_node(ip);
+	storage::db.add_node(one.hash, ip);
+}
+/*********************************************************/
+void nodes_handler::check(void) {
+	using structs::father;
+	using structs::nodes;
+	using structs::role;
+
+	auto time = system_clock::now() - ping;
+	pack msg;
+
+	mute.lock();
+
+	if (nodes.size() >= NODE_MIN || time > 500s
+		|| role == UDP_NONE) {
+		mute.unlock();
+		return;
+	}
+
+	ping = system_clock::now();
+	mute.unlock();
+
+	if (role == UDP_NODE) {
+		this->from_clients();
+		return;
+	}
+
+	if (structs::nodes.size() >= NODE_MIN) {
+		return;
+	}
+
+	msg.tmp(USER_REQ_NODE);
+	storage::tasks.add(msg, sddr_get(father.info.ipp),
+	                   father.info.hash);
+}
+/*********************************************************/
+void nodes_handler::from_clients(void) {
+	storage::clients.mute.lock();
+
+	for (auto p : structs::clients) {
+		if (structs::nodes.size() >= NODE_MIN) {
+			break;
 		}
 
-		this->mute.unlock();
-		return;
+		if (!p.is_node) {
+			continue;
+		}
+
+		this->add(p.hash, p.ipp.ip);
 	}
 
-	if (clock - this->last_req < 80s) {
-		this->mute.unlock();
-		return;
+	storage::clients.mute.unlock();
+}
+/*********************************************************/
+#if defined(DEBUG) && DEBUG == true
+
+void nodes_handler::print(void) {
+	cout << "Hash, Ip:Port" << endl
+		 << "----------------------" << endl;
+	mute.lock();
+
+	for (auto &p : structs::nodes) {
+		cout << bin2hex(HASHSIZE, p.hash) << ", " 
+			 << p.ipp.ip << ":" << p.ipp.port
+			 << endl;
 	}
 
-	this->request_getlist();
-	this->mute.unlock();
+	mute.unlock();
+	cout << endl << endl;
 }
-/**
-*	_neighbors::request_getlist - Создание запроса
-*	на получение новых нод.
-*/
-void _nodes::request_getlist(void)
-{
-	unsigned char *buffer;
-	struct tgn_task task;
-	struct tgn_node lst;
 
-	this->last_req = system_clock::now();
-
-	buffer = msg_tmp<true>(S_REQUEST_NODES);
-	memcpy(task.bytes, buffer, HEADERSIZE);
-	this->last_req = system_clock::now();
-	lst = this->get_last();
-
-	task.client_in = saddr_get(lst.ip, PORT);
-	task.target_only = false;
-	task.length = HEADERSIZE;
-
-	tgnstorage::tasks.add(task);
-
-	delete[] buffer;
-}
-/**
-*	_neighbors::_nodes - Устанавливает время последнего
-*	запроса на получения списка нод.
-*/
-_nodes::_nodes(void)
-{
-	this->last_req = system_clock::now();
-}
+#endif

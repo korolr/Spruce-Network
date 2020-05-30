@@ -1,99 +1,125 @@
-/**
-*	find.cpp - Часть модуля маршрутизации в котором
-*	хранятся функции обработки запросов на поиск клиентов.
-*
-*	@mrrva - 2019
-*/
-#include "../include/router.hpp"
-/**
-*	Используемые пространства имен и объекты.
-*/
-using namespace std;
-/**
-*	_router::req_find - Функция обработки полученных
-*	запросов на нахождение клиента в сети.
-*
-*	@msg - Сообщение от клиента сети.
-*	@skddr - Структура sockaddr_in.
-*/
-unsigned char *_router::req_find(tgnmsg &msg,
-	struct sockaddr_in &skddr)
-{
-	using tgnstorage::clients;
+// hash
+// hash - ip req node - hash
+//
+#include "../../include/network.hpp"
+/*********************************************************/
+struct ret find_router::req(struct sockaddr_in sddr,
+							pack msg) {
+	using structs::father;
+	using structs::keys;
+	using storage::tasks;
 
-	struct tgn_find_req req = msg.info_find();
-	const short hs = HASHSIZE;
-	struct sockaddr_in s_addr;
-	struct tgn_ipport ipport;
-	unsigned char *msb, *tmp;
-	struct tgn_task task;
+	unsigned char *info = msg.info(), *tmp;
+	bool found = false, first = false;
+	struct client fclient;
+	struct ipport ipp;
+	pack msg1, msg2;
+	size_t cmp;
+	bool res;
 
-	if (bytes_sum<hs>(req.hash) == 0x00)
-		return nullptr;
+	msg1.tmp(NODE_RES_FIND, msg.cookie());
 
-	if (clients.exists(req.hash)) {
-		msb = msg_tmp<true>(S_RESPONSE_FIND);
-		memcpy(msb + hs + 1, req.hash, hs);
-
-		if (req.from.length() < 6
-			|| req.from == "0.0.0.0")
-			return msb;
-
-		memcpy(task.bytes, msb, HEADERSIZE);
-		memset(msb + hs+ 1, 0x00, INFOSIZE);
-		s_addr = saddr_get(req.from, PORT);
-
-		task.length = HEADERSIZE;
-		task.target_only = true;
-		task.client_in = s_addr;
-
-		tgnstorage::tasks.add(task);
-		return msb;
+	if (is_null(info, HASHSIZE)) {
+		return handler::make_ret(sddr, msg.hash(), msg1);
 	}
-
-	msb = msg_tmp<true>(S_REQUEST_FIND);
-	ipport = ipport_get(skddr);
-
-	if (req.from.length() < 6
-		|| req.from == "0.0.0.0") {
-		tmp = iptobytes(ipport.ip);
-		memcpy(msb + hs * 2 + 5, tmp, 4);
+	/**
+	*	Adding host information that initiates a client
+	*	search.
+	*/
+	if (is_null(info + HASHSIZE, 4)) {
+		assert(tmp = ip2bytes((ipport_get(sddr)).ip));
+		msg.add_info(HASHSIZE + 4, msg.hash(), HASHSIZE);
+		msg.add_info(HASHSIZE, tmp, 4);
+		first = true;
 		delete[] tmp;
 	}
 
-	memcpy(task.bytes, msb, HEADERSIZE);
-	memset(msb + hs+ 1, 0x00, INFOSIZE);
-	task.length = HEADERSIZE;
-	task.target_only = true;
+	storage::clients.mute.lock();
+	fclient = structs::clients[0];
+	/**
+	*	Searching for the right client among registered
+	*	users or the nearest node to the desired network
+	*	client with us.
+	*/
+	for (auto &p : structs::clients) {
+		cmp = storage::father.cmp(info, p.hash,
+		                          fclient.hash);
 
-	for (auto &p : tgnstruct::nodes) {
-		task.client_in = saddr_get(p.ip, PORT);
-		tgnstorage::tasks.add(task);
+		if (p.is_node && cmp == 1) {
+			fclient = p;
+		}
+
+		if (cmp != 0) {
+			continue;
+		}
+
+		found = true;
+		break;
 	}
 
-	return msb;
+	storage::clients.mute.unlock();
+	/**
+	*	If the desired client was found at the second node
+	*	in the chain (if there is no information to send a
+	*	response - a sign that the second node is in the
+	*	chain).
+	*/
+	if (first && found) {
+		msg1.set_info(info, HASHSIZE);
+		return handler::make_ret(sddr, msg.hash(), msg1);
+	}
+
+	if (found) {
+		ipp = { UDP_PORT, bytes2ip(info + HASHSIZE) };
+		msg2.tmp(NODE_RES_FIND);
+		msg2.set_info(info, HASHSIZE);
+
+		tasks.add(msg2, sddr_get(ipp), info + HASHSIZE +
+				  4);
+		return handler::make_ret(sddr, msg.hash(), msg1);
+	}
+	/**
+	*	If the user you are looking for is the father or
+	*	if the father is the more suitable site for the
+	*	search, or if we are the desired customer.
+	*/
+	cmp = storage::father.cmp(info, father.info.hash,
+							  fclient.hash);
+	msg2.tmp(NODE_REQ_FIND);
+	msg2.set_info(info, HASHSIZE * 2 + 4);
+	tmp = father.info.hash;
+
+	res = memcmp(keys.pub, info, HASHSIZE) == 0
+		|| memcmp(info, tmp, HASHSIZE) == 0
+		|| cmp == 1;
+
+	if (res) {
+		ipp = father.info.ipp;
+		tasks.add(msg2, sddr_get(ipp), father.info.hash);
+		return handler::make_ret(sddr, msg.hash(), msg1);
+	}
+	/**
+	*	If all the previous conditions have not passed,
+	*	we send a search request to the node that was
+	*	found in the loop
+	*/
+	tasks.add(msg2, sddr_get(fclient.ipp), fclient.hash);
+	return handler::make_ret(sddr, msg.hash(), msg1);
 }
-/**
-*	_router::rsp_find - Функция обработки полученных
-*	ответов на запрос нахождение клиента в сети.
-*
-*	@msg - Сообщение от клиента сети.
-*	@skddr - Структура sockaddr_in.
-*/
-unsigned char *_router::rsp_find(tgnmsg &msg,
-	struct sockaddr_in &skddr)
-{
-	using tgnstorage::routes;
+/*********************************************************/
+void find_router::res(struct sockaddr_in sddr, pack msg) {
+	unsigned char *info = msg.info();
+	struct ipport ipp;
+	struct route fr;
+	pack res;
 
-	struct tgn_find_req req = msg.info_find();
-	struct tgn_ipport ipp = ipport_get(skddr);
+	storage::tasks.rm_cookie(msg.cookie());
 
-	if (bytes_sum<HASHSIZE>(req.hash) == 0x00)
-		return nullptr;
-
-	if (routes.exists(req.hash) == 1) {
-		routes.update(req.hash, {ipp.ip, PORT});
+	if (is_null(info, HASHSIZE)
+		|| !storage::routes.find(info, fr)) {
+		return;
 	}
 
-	return nullptr;
+	ipp = { UDP_PORT, bytes2ip(info += HASHSIZE) };
+	storage::routes.update(info, info + 4, ipp);
 }

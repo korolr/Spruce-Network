@@ -1,116 +1,135 @@
-/**
-*	nodes.cpp - Модуль отвечающий за работу с
-*	структурой клиентов сети TGN.
-*
-*	@mrrva - 2019
-*/
-#include "../include/storage.hpp"
-/**
-*	Используемые пространства имен и объекты.
-*/
-using namespace std;
-/**
-*	_clients::update - Обновляет и добавляет клиентов
-*	сети.
-*
-*	@hash - Публичный ключ клиента.
-*	@ipport - Структура ipport.
-*/
-void _clients::update(unsigned char *hash,
-	struct tgn_ipport &ipport)
-{
-	struct tgn_client new_one;
 
-	this->mute.lock();
-
-	for (auto &p : tgnstruct::clients)
-		if (p.ipport.ip == ipport.ip) {
-			p.ping = chrono::system_clock::now();
-			memcpy(p.hash, hash, HASHSIZE);
-			this->mute.unlock();
-			return;
-		}
-
-	new_one.ping = chrono::system_clock::now();
-	memcpy(new_one.hash, hash, HASHSIZE);
-	new_one.ipport = ipport;
-
-	tgnstruct::clients.push_back(new_one);
-	this->mute.unlock();
-}
-/**
-*	_clients::autoremove - Удаление пользователей,
-*	которые не посылали запросы дольше 6 секунд.
-*/
-void _clients::autoremove(void)
-{
-	using tgnstruct::clients;
-
-	time_point<system_clock> time_now;
-
-	this->mute.lock();
-
-	if (clients.empty()) {
-		this->mute.unlock();
+#include "../../include/storage.hpp"
+/*********************************************************/
+void clients_handler::reg(unsigned char *hash,
+						  struct ipport ipp,
+						  enum udp_role role) {
+	bool is_node = false;
+	struct client one;
+	
+	if (!hash || role == UDP_NONE) {
 		return;
 	}
 
-	time_now = chrono::system_clock::now();
+	if (ipp.port == UDP_PORT && role == UDP_NODE) {
+		is_node = true;
+	}
 
-	for (size_t i = 0; i < clients.size(); i++)
-		if (time_now - clients[i].ping > 6s) 
-			clients.erase(clients.begin() + i);
-	this->mute.unlock();
-}
-/**
-*	_clients::exists - Проверка существования клиента
-*	в общем списке.
-*
-*	@hash - Хэш клиента.
-*/
-bool _clients::exists(unsigned char *hash)
-{
-	bool status = false;
+	mute.lock();
 
-	if (!hash || hash == nullptr)
-		return false;
-
-	this->mute.lock();
-
-	for (auto &p : tgnstruct::clients)
-		if (memcmp(hash, p.hash, HASHSIZE) == 0) {
-			status = true;
-			break;
+	for (auto &p : structs::clients) {
+		if (ipp.ip != p.ipp.ip) {
+			continue;
 		}
 
-	this->mute.unlock();
-	return status;
+		memcpy(p.hash, hash, HASHSIZE);
+		p.ping = system_clock::now();
+		p.is_node = is_node;
+		mute.unlock();
+		return;
+	}
+
+	memcpy(one.hash, hash, HASHSIZE);
+	one.ping = system_clock::now();
+	one.is_node = is_node;
+	one.ipp = ipp;
+
+	structs::clients.push_back(one);
+	mute.unlock();
+
+	if (is_node) {
+		storage::nodes.add(hash, ipp.ip);
+	}
 }
-/**
-*	_clients::find - Функция нахождения клиента в
-*	общем списке клиентов.
-*
-*	@buffer - Структура записи клиента.
-*	@hash - Хэш клиента.
-*/
-bool _clients::find(struct tgn_client &buffer,
-	unsigned char *hash)
-{
-	bool status = false;
+/*********************************************************/
+void clients_handler::rm_ip(string ip) {
+	using structs::clients;
 
-	if (!hash || hash == nullptr)
-		return false;
+	vector<struct client>::iterator it;
 
-	this->mute.lock();
+	if (ip.length() < 8) {
+		return;
+	}
 
-	for (auto &p : tgnstruct::clients)
-		if (memcmp(hash, p.hash, HASHSIZE) == 0) {
-			status = true;
-			buffer = p;
-			break;
+	mute.lock();
+	it = clients.begin();
+
+	for (; it != clients.end(); it++) {
+		if ((*it).ipp.ip != ip) {
+			continue;
 		}
 
-	this->mute.unlock();
-	return status;
+		clients.erase(it);
+		break;
+	}
+
+	mute.unlock();
+}
+/*********************************************************/
+void clients_handler::rm_hash(unsigned char *hash) {
+	using structs::clients;
+
+	vector<struct client>::iterator it;
+
+	if (!hash) {
+		return;
+	}
+
+	mute.lock();
+	it = clients.begin();
+
+	for (; it != clients.end(); it++) {
+		if (memcmp((*it).hash, hash, HASHSIZE) != 0) {
+			continue;
+		}
+
+		clients.erase(it);
+		break;
+	}
+
+	mute.unlock();
+}
+/*********************************************************/
+void clients_handler::check(void) {
+	using structs::clients;
+
+	auto time = system_clock::now();
+	size_t size;
+
+	mute.lock();
+
+	if ((size = clients.size()) == 0) {
+		mute.unlock();
+		return;
+	}
+
+	for (size_t i = 0; i < size; i++) {
+		if (time - clients[i].ping < 8s) {
+			continue;
+		}
+
+		clients.erase(clients.begin() + i);
+	}
+
+	mute.unlock();
+}
+/*********************************************************/
+#if defined(DEBUG) && DEBUG == true
+
+void clients_handler::print(void) {
+	cout << "Hash, Ip:Port, Is node" << endl
+		 << "----------------------" << endl;
+	mute.lock();
+
+	for (auto &p : structs::clients) {
+		cout << bin2hex(HASHSIZE, p.hash) << ", " 
+			 << p.ipp.ip << ":" << p.ipp.port
+			 << ((p.is_node) ? ", True" : ", False")
+			 << endl;
+	}
+
+	mute.unlock();
+	cout << endl << endl;
 }
 
+#endif
