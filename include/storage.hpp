@@ -15,6 +15,7 @@ class tasks_handler {
 		bool exists(enum udp_type);
 		void rm_cookie(size_t);
 		void renew(void);
+		void check(void);
 #if defined(DEBUG) && DEBUG == true
 		void print(void);
 #endif
@@ -28,11 +29,11 @@ class nodes_handler {
 		void from_clients(void);
 
 	public:
+		nodes_handler(void) { ping = system_clock::now() - 600s; }
 		void insert(unsigned char *, string);
 		void add(unsigned char *, string);
 		void rm_hash(unsigned char *);
 		void temporary_father(void);
-		nodes_handler(void);
 		void select(void);
 		void check(void);
 #if defined(DEBUG) && DEBUG == true
@@ -45,7 +46,9 @@ class clients_handler {
 		mutex mute;
 
 		void reg(unsigned char *, struct ipport, enum udp_role);
+		bool find(unsigned char *, struct client &);
 		void rm_hash(unsigned char *);
+		bool exists(unsigned char *);
 		void rm_ip(string);
 		void check(void);
 #if defined(DEBUG) && DEBUG == true
@@ -60,9 +63,9 @@ class father_handler {
 
 	public:
 		size_t cmp(unsigned char *, unsigned char *, unsigned char *);
+		father_handler(void) { ping = system_clock::now() - 600s; }
 		bool from_father(struct sockaddr_in, pack);
 		void set(struct client);
-		father_handler(void);
 		void no_father(void);
 		void check(void);
 #if defined(DEBUG) && DEBUG == true
@@ -128,10 +131,10 @@ class tunnels_handler {
 	public:
 		bool find_ports(unsigned char *, unsigned char *, pair<size_t, size_t> &);
 		void add(unsigned char *, unsigned char *, struct init_data);
+		tunnels_handler(void) { set_sockaddr(st.sddr); }
 		bool sys_freeport(size_t);
 		bool is_freeport(size_t);
 		size_t free_port(void);
-		tunnels_handler(void);
 		void check(void);
 #if defined(DEBUG) && DEBUG == true
 		void print(void);
@@ -186,8 +189,8 @@ namespace storage {
 
 	inline void check(void) {
 		dadreqs.check(); father.check(); routes.check();
-		tunnels.check(); nodes.check(); clients.check();
-		msgs.check();
+		tunnels.check(); clients.check(); nodes.check();
+		msgs.check(); tasks.check();
 	}
 }
 

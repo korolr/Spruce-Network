@@ -27,8 +27,8 @@ void dadreqs_handler::add(struct sockaddr_in sddr,
 
 	assert(hash);
 
-	memcpy(one.hash, hash, HASHSIZE);
 	one.time = system_clock::now();
+	HASHCPY(one.hash, hash);
 	one.sddr = sddr;
 
 	mute.lock();

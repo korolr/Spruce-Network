@@ -1,5 +1,5 @@
 // hash
-// hash to - hash from - port - status byte
+// hash to - hash from - port - status byte - is_error with routins
 
 // добавить hash от кого запрос
 #include "../../include/network.hpp"
@@ -15,7 +15,6 @@ struct ret tunnels_router::req(struct sockaddr_in sddr,
 	enum tcp_role role;
 	struct route fr;
 	pack req, res;
-	size_t cmp;
 	bool found;
 
 	res.tmp(NODE_RES_TUNNEL, msg.cookie());
@@ -27,7 +26,7 @@ struct ret tunnels_router::req(struct sockaddr_in sddr,
 	/**
 	*	If the request is for us.
 	*/
-	if (memcmp(keys.pub, to, HASHSIZE) == 0) {
+	if (IS_ME(to)) {
 		return this->get_message(sddr, to, hash,
 								 msg.cookie());
 	}
@@ -35,10 +34,19 @@ struct ret tunnels_router::req(struct sockaddr_in sddr,
 	*	If the route has already been created before, we
 	*	proceed to the generation of the TCP tunnel.
 	*/
-	if ((found = storage::routes.find(to, fr))
-		&& fr.full) {
-		return this->newtunnel(sddr, fr, TCP_BINDER1,
-							   msg);
+	if ((found = storage::routes.find(to, fr)) && fr.full) {
+		/**
+		*	If the fathe node is changed by user.
+		*/
+		if (!storage::clients.exists(to)) {
+			unsigned char error  = 0x01;
+			storage::routes.rm_hash(to);
+
+			res.add_info(HASHSIZE * 2 + 5, &error, 1);
+			return handler::make_ret(sddr, hash, res);
+		}
+
+		return this->newtunnel(sddr, fr, TCP_BINDER1, msg);
 	}
 	/**
 	*	Network user in the search process.
@@ -46,53 +54,24 @@ struct ret tunnels_router::req(struct sockaddr_in sddr,
 	if (found && !fr.full) {
 		return handler::make_ret(sddr, hash, res);
 	}
-
-	storage::routes.set(found, to, nullptr, {0, ""});
-	nclient = structs::father.info;
-
-	storage::clients.mute.lock();
 	/**
-	*	The cycle of finding a suitable node to search for
-	*	the client or the client itself (a situation is
-	*	possible when 2 clients for the tunnel are connected
-	*	to 1 node)
+	*	If the customer you are looking for is a registered
+	*	user.
 	*/
-	for (auto p : structs::clients) {
-		cmp = father.cmp(to, p.hash, nclient.hash);
+	if (storage::clients.find(to, nclient)) {
+		HASHCPY(fr.father, to);
+		fr.ipp = nclient.ipp;
 
-		if (p.is_node && cmp == 1) {
-			nclient = p;
-		}
-
-		if (memcmp(p.hash, hash, HASHSIZE) != 0) {
-			continue;
-		}
-
-		storage::clients.mute.unlock();
-		/**
-		*	If the user you are looking for to create a
-		*	tunnel is registered with us, we proceed to
-		*	the creation of the tunnel.
-		*/
-		found = to + HASHSIZE * 2 + 4 == 0x00;
-		memcpy(fr.father, p.hash, HASHSIZE);
-		fr.ipp = p.ipp;
-
-		role = (found) ? TCP_UBINDER  : TCP_BINDER2;
+		role = (to + HASHSIZE * 2 + 4 == 0x00) ? TCP_UBINDER 
+											   : TCP_BINDER2;
 		return this->newtunnel(sddr, fr, role, msg);
 	}
-
-	storage::clients.mute.lock();
 	/**
 	*	The client was not found - we create a request for
 	*	its search in the network.
 	*/
-	req.tmp(NODE_REQ_FIND);
-	req.set_info(to, HASHSIZE);
-
-	storage::tasks.add(req, sddr_get(nclient.ipp),
-					   nclient.hash);
-	return handler::make_ret(sddr, hash, res);
+	storage::tasks.add(res, sddr, hash);
+	return this->find_req(to);
 }
 /*********************************************************/
 struct ret tunnels_router::newtunnel(struct sockaddr_in sddr,
@@ -208,7 +187,9 @@ void tunnels_router::res(struct sockaddr_in sddr,
 	unsigned char *hash = msg.hash();
 	enum tcp_role role;
 	struct route one;
+	struct ret task;
 	size_t port;
+	pack req;
 
 	storage::tasks.rm_cookie(msg.cookie());
 
@@ -223,6 +204,14 @@ void tunnels_router::res(struct sockaddr_in sddr,
 	role = (*(from + HASHSIZE + 4) == 0x01) ? TCP_BINDER2
 											: TCP_BINDER1;
 	memcpy(&port, from + HASHSIZE, 4);
+	/**
+	*	If error with routing in the chain.
+	*/
+	if (*(from + HASHSIZE + 5) == 0x01) {
+		task = this->find_req(target);
+		storage::tasks.add(task.msg, task.sddr, task.hash);
+		return;
+	}
 
 	if (!storage::tunnels.is_freeport(port)
 		|| role == TCP_BINDER2) {
@@ -243,4 +232,35 @@ void tunnels_router::res(struct sockaddr_in sddr,
 	*/
 	tunnels.add(target, from, {TCP_SND, hash, TCP_SENDER,
 							  one.ipp});
+}
+
+
+
+struct ret tunnels_router::find_req(unsigned char *to) {
+	using storage::father;
+
+	struct client node = structs::father.info;
+	pack msg;
+	int cmp;
+
+	msg.tmp(NODE_REQ_FIND);
+	msg.set_info(to, HASHSIZE);
+
+	storage::routes.rm_hash(to);
+	storage::routes.set(false, to, nullptr, {});
+
+	storage::clients.mute.lock();
+
+	for (auto &p : structs::clients) {
+		cmp = father.cmp(to, p.hash, node.hash);
+
+		if (p.is_node && cmp == 1) {
+			node = p;
+		}
+	}
+
+	storage::clients.mute.lock();
+
+	return handler::make_ret(sddr_get(node.ipp),
+							 node.hash, msg);
 }

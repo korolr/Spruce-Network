@@ -230,7 +230,7 @@ string database_handler::get_var(string name)
 
 	mute.lock();
 
-	q = "SELECT `value` FROM `settgngs` WHERE `name`='" +
+	q = "SELECT `value` FROM `settings` WHERE `name`='" +
 		name + "'";
 	sqlite3_prepare_v2(db, q.c_str(), -1, &rs, nullptr);
 
@@ -285,7 +285,7 @@ bool database_handler::get_father(unsigned char *hash,
 	mute.unlock();
 
 	assert(tmp = hex2bin(HASHSIZE * 2, strhash));
-	memcpy(hash, tmp, HASHSIZE);
+	HASHCPY(hash, tmp);
 	delete[] tmp;
 
 	return ip.length() > 6;

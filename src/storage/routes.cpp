@@ -20,8 +20,8 @@ void routes_handler::set(bool full, unsigned char *hash,
 				break;
 			}
 
-			memcpy(one.father, father, HASHSIZE);
 			p.time = system_clock::now();
+			HASHCPY(one.father, father);
 			p.full = true;
 			p.ipp = ipp;
 
@@ -35,14 +35,14 @@ void routes_handler::set(bool full, unsigned char *hash,
 		return;
 	}
 
-	memcpy(one.hash, hash, HASHSIZE);
 	one.time = system_clock::now();
+	HASHCPY(one.hash, hash);
 	one.full = full;
 	one.ipp = ipp;
 
 	if (full) {
 		assert(father);
-		memcpy(one.father, father, HASHSIZE);
+		HASHCPY(one.father, father);
 	}
 
 	structs::routes.push_back(one);
@@ -74,8 +74,8 @@ void routes_handler::update(unsigned char *hash,
 		return;
 	}
 
-	memcpy((*it).father, father, HASHSIZE);
 	(*it).time = system_clock::now();
+	HASHCPY((*it).father, father);
 	(*it).full = true;
 	(*it).ipp = ipp;
 

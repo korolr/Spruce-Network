@@ -27,7 +27,7 @@ struct ret find_router::req(struct sockaddr_in sddr,
 	*	search.
 	*/
 	if (is_null(info + HASHSIZE, 4)) {
-		assert(tmp = ip2bytes((ipport_get(sddr)).ip));
+		assert(tmp = ip2bin((ipport_get(sddr)).ip));
 		msg.add_info(HASHSIZE + 4, msg.hash(), HASHSIZE);
 		msg.add_info(HASHSIZE, tmp, 4);
 		first = true;
@@ -70,7 +70,7 @@ struct ret find_router::req(struct sockaddr_in sddr,
 	}
 
 	if (found) {
-		ipp = { UDP_PORT, bytes2ip(info + HASHSIZE) };
+		ipp = { UDP_PORT, bin2ip(info + HASHSIZE) };
 		msg2.tmp(NODE_RES_FIND);
 		msg2.set_info(info, HASHSIZE);
 
@@ -89,9 +89,8 @@ struct ret find_router::req(struct sockaddr_in sddr,
 	msg2.set_info(info, HASHSIZE * 2 + 4);
 	tmp = father.info.hash;
 
-	res = memcmp(keys.pub, info, HASHSIZE) == 0
-		|| memcmp(info, tmp, HASHSIZE) == 0
-		|| cmp == 1;
+	res = memcmp(info, tmp, HASHSIZE) == 0 || cmp == 1
+		|| IS_ME(info);
 
 	if (res) {
 		ipp = father.info.ipp;
@@ -120,6 +119,6 @@ void find_router::res(struct sockaddr_in sddr, pack msg) {
 		return;
 	}
 
-	ipp = { UDP_PORT, bytes2ip(info += HASHSIZE) };
+	ipp = { UDP_PORT, bin2ip(info += HASHSIZE) };
 	storage::routes.update(info, info + 4, ipp);
 }

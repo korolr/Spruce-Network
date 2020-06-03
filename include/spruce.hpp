@@ -249,7 +249,7 @@ struct ipport
 ipport_get(struct sockaddr_in);
 
 string
-bytes2ip(unsigned char *);
+bin2ip(unsigned char *);
 
 unsigned char *
 hex2bin(size_t, string);
@@ -261,14 +261,34 @@ size_t
 random_cookie(void);
 
 unsigned char *
-ip2bytes(string);
+ip2bin(string);
+
+int
+new_socket(int, size_t);
 
 void
-socket_close(int);
+set_sockaddr(struct sockaddr_in &, size_t port = 0, string ip = "");
 
-#define THREAD_START() if (structs::threads >= PACKLIM) \
-	return; ++structs::threads;
+#define THREAD_START()												\
+	if (structs::threads >= PACKLIM) {								\
+		return;														\
+	}																\
+	++structs::threads;
 
-#define THREAD_END() --structs::threads; return;
+#define THREAD_END()												\
+	--structs::threads;												\
+	return;
+
+#define HASHCPY(to, from)											\
+	memcpy((to), (from), HASHSIZE);
+
+#define IS_ME(key)													\
+	(memcmp((key), structs::keys.pub, HASHSIZE) == 0)
+
+#define CLOSE_SOCKET(s)												\
+	if ((s) != 0) {													\
+		shutdown((s), SHUT_RDWR);									\
+		close((s));													\
+	}
 
 #endif

@@ -36,7 +36,7 @@ void father_router::res(struct sockaddr_in sddr, pack msg) {
 	*	customer. If so, send it to the user.
 	*/
 	if (storage::dadreqs.find(req, info)) {
-		ip = ip2bytes(ipp.ip);
+		assert(ip = ip2bin(ipp.ip));
 
 		res.tmp(NODE_RES_FATHER);
 		res.set_info(msg.hash(), HASHSIZE);
@@ -59,8 +59,8 @@ void father_router::res(struct sockaddr_in sddr, pack msg) {
 		return;
 	}
 
-	nfather.ipp.ip = bytes2ip(info + HASHSIZE);
-	memcpy(nfather.hash, info, HASHSIZE);
+	nfather.ipp.ip = bin2ip(info + HASHSIZE);
+	HASHCPY(nfather.hash, info);
 	nfather.ipp.port = UDP_PORT;
 
 	storage::father.set(nfather);
@@ -140,8 +140,8 @@ struct ret father_router::chain(struct sockaddr_in sddr,
 	*	be sent to this address.
 	*/
 	if (is_null(info + HASHSIZE, 4)) {
-		assert(ip = ip2bytes(ipp.ip));
-		memcpy(info + HASHSIZE + 4, hash, HASHSIZE);
+		assert(ip = ip2bin(ipp.ip));
+		HASHCPY(info + HASHSIZE + 4, hash);
 		memcpy(info + HASHSIZE, ip, 4);
 		delete[] ip;
 	}
@@ -186,7 +186,7 @@ struct ret father_router::chain(struct sockaddr_in sddr,
 /*********************************************************/
 struct ret father_router::iamfather(unsigned char *bytes) {
 	unsigned char *ip = bytes + HASHSIZE;
-	struct ipport ipp = { UDP_PORT, bytes2ip(ip) };
+	struct ipport ipp = { UDP_PORT, bin2ip(ip) };
 	pack res;
 
 	res.tmp(NODE_RES_FATHER);

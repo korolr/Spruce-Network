@@ -20,10 +20,10 @@ struct ret nodes_router::req(struct sockaddr_in sddr,
 		}
 
 		tmp = (max - 1) * (HASHSIZE + 4);
-		assert(ip = ip2bytes(p.ipp.ip));
+		assert(ip = ip2bin(p.ipp.ip));
 
-		memcpy(buff + tmp, p.hash, HASHSIZE);
 		memcpy(buff + tmp + HASHSIZE, ip, 4);
+		HASHCPY(buff + tmp, p.hash);
 
 		delete[] ip;
 
@@ -53,8 +53,8 @@ void nodes_router::res(struct sockaddr_in sddr, pack msg) {
 	for (size_t i = 0; i < max; i++) {
 		tmp = (max - 1) * (HASHSIZE + 4);
 
-		ip = bytes2ip(info + tmp + HASHSIZE);
-		memcpy(hash, info + tmp,   HASHSIZE);
+		ip = bin2ip(info + tmp + HASHSIZE);
+		HASHCPY(hash, info + tmp);
 
 		if (is_null(hash, HASHSIZE) || ip.length() < 5) {
 			max--;

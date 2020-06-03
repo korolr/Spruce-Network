@@ -82,7 +82,7 @@ bool is_null(unsigned char *buff, size_t len) {
 	return res == 0;
 }
 
-unsigned char *ip2bytes(string ip) {
+unsigned char *ip2bin(string ip) {
 	unsigned char *bytes, num;
 	stringstream ss(ip);
 	string buff;
@@ -103,7 +103,7 @@ unsigned char *ip2bytes(string ip) {
 	return bytes;
 }
 
-string bytes2ip(unsigned char *b) {
+string bin2ip(unsigned char *b) {
 	size_t sum = 0;
 	stringstream ss;
 
@@ -129,11 +129,30 @@ string bytes2ip(unsigned char *b) {
 	return ss.str();
 }
 
-void socket_close(int sock) {
-	if (sock == 0) {
-		return;
+int new_socket(int type, size_t time) {
+	int sol = SOL_SOCKET, opt, new_sock;
+	struct timeval timeout;
+	char *t_opt;
+
+	if ((new_sock = socket(AF_INET, type, 0)) == 0) {
+		return 0;
 	}
 
-	shutdown(sock, SHUT_RDWR);
-	close(sock);
+	t_opt = reinterpret_cast<char *>(&timeout);
+	timeout.tv_sec = time;
+	opt = sizeof(timeout);
+	timeout.tv_usec = 0;
+
+	setsockopt(new_sock, sol, SO_RCVTIMEO, t_opt, opt);
+	setsockopt(new_sock, sol, SO_SNDTIMEO, t_opt, opt);
+
+	return new_sock;
+}
+
+void set_sockaddr(struct sockaddr_in &sddr, size_t port,
+				  string ip) {
+	sddr.sin_addr.s_addr = (ip.length() > 0) ? inet_addr(ip.c_str())
+											 : INADDR_ANY;
+	sddr.sin_port = htons(port);
+	sddr.sin_family = AF_INET;
 }

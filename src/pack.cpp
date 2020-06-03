@@ -7,7 +7,7 @@ pack::pack(unsigned char *buff, size_t size) {
 	correct = false;
 	trash_size = 0;
 
-	if (buff == nullptr || size < UDP_PACK) {
+	if (!buff || size < UDP_PACK) {
 		return;
 	}
 	// Сообщение может иметь любой размер, главное
@@ -134,7 +134,8 @@ size_t pack::cookie(void) {
 /*********************************************************/
 void pack::gentrash_nix(void) {
 	ifstream fd("/dev/urandom", ios::binary);
-	assert(trash_size <= 100 && trash_size > 0);
+	trash_size = (trash_size <= 100 && trash_size > 0) ? trash_size
+													   : 100;
 	assert(fd.good());
 
 	fd.read(reinterpret_cast<char *>(right), trash_size);
@@ -158,22 +159,24 @@ struct udp_task pack::to_task(unsigned char *hash,
 	struct udp_task task;
 
 	assert(correct && hash);
-
-	bytes = encryption::pack(hash, buffer, UDP_PACK);
 	srand(time(nullptr));
 	dop += (trash_size = rand() % 100);
 
+	task.type = static_cast<enum udp_type>(*buffer);
+	memcpy(&task.cookie, buffer + HASHSIZE + 1, 4);
+
+	bytes = encryption::pack(hash, buffer, UDP_PACK);
 	assert(bytes);
 
 	if (sddr != nullptr) {
 		task.sddr = *sddr;
 	}
 
-	#ifdef _WIN32
-		this->gentrash_win();
-	#else 
-		this->gentrash_nix();
-	#endif
+#ifdef _WIN32
+	this->gentrash_win();
+#else 
+	this->gentrash_nix();
+#endif
 
 	memcpy(task.buff + dop, right, trash_size);
 	memcpy(task.buff, left, trash_size);
@@ -185,3 +188,27 @@ struct udp_task pack::to_task(unsigned char *hash,
 	delete[] bytes;
 	return task;
 }
+/*********************************************************/
+#if defined(DEBUG) && DEBUG == true
+
+void pack::debug(void) {
+	string hex;
+
+	if (!correct) {
+		return;
+	}
+
+	hex = bin2hex(UDP_PACK, buffer);
+
+	for (size_t i = 0; i < hex.length(); i++) {
+		cout << hex[i];
+
+		if (i % 2 != 0) {
+			cout << " ";
+		}
+	}
+
+	cout << endl << endl;
+}
+
+#endif

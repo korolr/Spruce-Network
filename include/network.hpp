@@ -23,17 +23,17 @@ class udp_network {
 		void send_package(struct udp_task);
 		void send_thread(void);
 		void recv_thread(void);
-		int udp_socket(size_t);
 
 	public:
 		atomic<bool> work = false;
 
 		void start(void);
-		udp_network(void);
-
+		udp_network(void)  {
+			set_sockaddr(recv.sddr, UDP_PORT);
+		}
 		~udp_network(void) {
 			if (!work) { return; }
-			socket_close(sock);
+			CLOSE_SOCKET(sock);
 
 			thr1.join();
 			thr2.join();
@@ -63,6 +63,7 @@ class tunnels_router {
 							 enum tcp_role, pack);
 		struct ret get_message(struct sockaddr_in, unsigned char *,
 							   unsigned char *, size_t);
+		struct ret find_req(unsigned char *);
 
 	public:
 		struct ret req(struct sockaddr_in, pack);

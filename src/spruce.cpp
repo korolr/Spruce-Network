@@ -6,42 +6,35 @@
 #include "../include/spruce.hpp"
 
 void user_api(size_t port) {
+	socklen_t sz = sizeof(struct sockaddr_in);
 	struct sddr_structs srv, cln;
 	unsigned char buff[PACKLEN];
 	int usock, rs;
-	socklen_t sz;
 	userapi api;
 	size_t len;
 	string tmp;
 
-	usock = socket(AF_INET, SOCK_STREAM, 0);
-	sz = sizeof(struct sockaddr_in);
-
+	usock = new_socket(SOCK_STREAM, TIMEOUT);
 	assert(usock != 0 && port != 0);
-
-	srv.sddr.sin_addr.s_addr = INADDR_ANY;
-	srv.sddr.sin_port = htons(port);
-	srv.sddr.sin_family = AF_INET;
+	set_sockaddr(srv.sddr, port);
 
 	if (bind(usock, srv.ptr, sz) != 0) {
 		cout << "[W]: Incorrect API port.\n";
-		socket_close(usock);
+		CLOSE_SOCKET(usock);
 		return;
 	}
 
 	if (listen(usock, 5) != 0) {
 		cout << "[W]: Can't start listening.\n";
-		socket_close(usock);
-		return;
-	}
-
-	if ((rs = accept(usock, cln.ptr, &sz)) < 0) {
-		cout << "[W]: Accept failed.\n";
-		socket_close(usock);
+		CLOSE_SOCKET(usock);
 		return;
 	}
 
 	while (network.work) {
+		if ((rs = accept(usock, cln.ptr, &sz)) < 0) {
+			continue;
+		}
+
 		memset(buff, 0x00, PACKLEN);
 
 		len = recv(rs, buff, PACKLEN, 0);
@@ -104,8 +97,8 @@ int main(void) {
 	check = thread(check_storage);
 
 	apistr = db.get_var("API_PORT");
-	user_api((apistr != "") ? stoi(apistr)
-							: API_PORT);
+	user_api((apistr != "") ? stoi(apistr) : API_PORT);
+
 	check.join();
 
 	return 0;

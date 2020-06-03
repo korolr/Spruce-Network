@@ -3,7 +3,6 @@
 /*********************************************************/
 void tasks_handler::add(pack msg, struct sockaddr_in sddr,
 						unsigned char *hash) {
-	unsigned char *bytes = msg.bytes();
 	struct udp_task task;
 
 	if (!msg.is_correct() || !hash) {
@@ -11,11 +10,8 @@ void tasks_handler::add(pack msg, struct sockaddr_in sddr,
 	}
 
 	task = msg.to_task(hash, &sddr);
-
-	task.type = static_cast<enum udp_type>(*bytes);
-	memcpy(&task.cookie, bytes + HASHSIZE + 1, 4);
-	memcpy(task.hash, hash, HASHSIZE);
 	task.time = system_clock::now();
+	HASHCPY(task.hash, hash);
 	task.attempts = 0;
 
 	mute.lock();
@@ -73,6 +69,7 @@ void tasks_handler::rm_cookie(size_t cookie) {
 }
 /*********************************************************/
 void tasks_handler::renew(void) {
+	using structs::father;
 	using structs::tasks;
 
 	size_t size;
@@ -88,6 +85,17 @@ void tasks_handler::renew(void) {
 			continue;
 		}
 
+		if (structs::role == UDP_USER) {
+			if (tasks[i].type != USER_REQ_TUNNEL
+				&& tasks[i].type != USER_REQ_NODE) {
+				tasks.erase(tasks.begin() + i);
+				continue;
+			}
+
+			tasks[i].sddr = sddr_get(father.info.ipp);
+		}
+		
+
 		tasks[i].time = system_clock::now() - 30s;
 		tasks[i].attempts = 0;
 	}
@@ -100,7 +108,7 @@ bool tasks_handler::exists(enum udp_type type) {
 
 	mute.lock();
 
-	for (auto p : structs::tasks) {
+	for (auto &p : structs::tasks) {
 		if (p.type == type && p.attempts < 3) {
 			status = true;
 			break;
@@ -137,6 +145,7 @@ bool tasks_handler::first(struct udp_task &one) {
 
 		if (tasks[i].attempts >= 3
 			|| one.time < tasks[i].time) {
+			// Если много сообщений для отца - смена
 			continue;
 		}
 
@@ -144,16 +153,52 @@ bool tasks_handler::first(struct udp_task &one) {
 		status = true;
 		id = i;
 	}
-	// Пусть все видят что я ебанутый :)
-	(*(tasks.begin() + id)).time = system_clock::now();
-	(*(tasks.begin() + id)).attempts++;
+
+	tasks[id].time = system_clock::now();
+	tasks[id].attempts++;
 
 	if (one.type % 2 == 0) {
 		tasks.erase(tasks.begin() + id);
 	}
 
 	mute.unlock();
-	return status;
+	return status && one.attempts <= 3;
+}
+/*********************************************************/
+void tasks_handler::check(void) {
+	using structs::tasks;
+
+	string ip = structs::father.info.ipp.ip;
+	auto time = system_clock::now();
+	size_t num = 0, size;
+	struct ipport ipp;
+
+	mute.lock();
+
+	if ((size = structs::tasks.size()) == 0) {
+		mute.unlock();
+		return;
+	}
+
+	for (size_t i = 0; i < size; i++) {
+		if (time - tasks[i].time > 600s
+			&& tasks[i].attempts >= 3) {
+			tasks.erase(tasks.begin() + i);
+		}
+	}
+
+	for (auto &p : tasks) {
+		if (ipport_get(p.sddr).ip == ip
+			&& p.attempts >= 3) {
+			num++;
+		}
+	}
+
+	mute.unlock();
+
+	if (num > 15) {
+		storage::father.no_father();
+	}
 }
 /*********************************************************/
 #if defined(DEBUG) && DEBUG == true

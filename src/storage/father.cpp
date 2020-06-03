@@ -1,9 +1,7 @@
 
 #include "../../include/storage.hpp"
-/*********************************************************/
-father_handler::father_handler(void) {
-	ping = system_clock::now() - 600s;
-}
+
+
 /*********************************************************/
 size_t father_handler::cmp(unsigned char *main,
 						   unsigned char *h1,
@@ -37,6 +35,12 @@ void father_handler::no_father(void) {
 }
 /*********************************************************/
 void father_handler::set(struct client new_father) {
+	using structs::keys;
+
+	if (IS_ME(new_father.hash)) {
+		return;
+	}
+
 	mute.lock();
 
 	new_father.ipp.port = UDP_PORT;
@@ -84,7 +88,7 @@ void father_handler::check(void) {
 		return;
 	}
 
-	if (system_clock::now() - ping <= 600s
+	if (system_clock::now() - ping <= 100s
 		|| structs::role == UDP_NONE) {
 		return;
 	}

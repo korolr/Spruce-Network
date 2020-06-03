@@ -1,10 +1,6 @@
 
 #include "../../include/storage.hpp"
 /*********************************************************/
-nodes_handler::nodes_handler(void) {
-	ping = system_clock::now();
-}
-/*********************************************************/
 void nodes_handler::select(void) {
 	map<unsigned char *, string> list = storage::db.nodes();
 	struct client one;
@@ -14,7 +10,7 @@ void nodes_handler::select(void) {
 	for (auto &p : list) {
 		assert(p.first);
 
-		memcpy(one.hash, p.first, HASHSIZE);
+		HASHCPY(one.hash, p.first);
 		one.ipp.ip = p.second;
 		one.ipp.port = UDP_PORT;
 		delete[] p.first;
@@ -34,6 +30,7 @@ void nodes_handler::temporary_father(void) {
 	using storage::father;
 	using structs::keys;
 
+	string ip = structs::father.info.ipp.ip;
 	struct client dad;
 
 	mute.lock();
@@ -46,7 +43,8 @@ void nodes_handler::temporary_father(void) {
 	dad = structs::nodes[0];
 
 	for (auto &p : structs::nodes) {
-		if (father.cmp(keys.pub, dad.hash, p.hash) == 1) {
+		if (father.cmp(keys.pub, dad.hash, p.hash) == 1
+			|| ip == p.ipp.ip) {
 			continue;
 		}
 
@@ -64,6 +62,12 @@ void nodes_handler::rm_hash(unsigned char *hash) {
 	assert(hash);
 
 	mute.lock();
+
+	if (structs::nodes.size() < 5) {
+		mute.unlock();
+		return;
+	}
+
 	it = structs::nodes.begin();
 
 	for (; it != structs::nodes.end(); it++) {
@@ -86,7 +90,8 @@ void nodes_handler::add(unsigned char *hash, string ip) {
 	assert(hash && ip.length() > 5);
 	mute.lock();
 
-	if (structs::nodes.size() >= NODE_LIMIT) {
+	if (structs::nodes.size() >= NODE_LIMIT
+		&& IS_ME(hash)) {
 		mute.unlock();
 		return;
 	}
@@ -98,8 +103,8 @@ void nodes_handler::add(unsigned char *hash, string ip) {
 		}
 	}
 
-	memcpy(one.hash, hash, HASHSIZE);
 	one.ipp = { UDP_PORT, ip };
+	HASHCPY(one.hash, hash);
 
 	structs::nodes.push_back(one);
 	mute.unlock();
@@ -118,25 +123,33 @@ void nodes_handler::check(void) {
 
 	mute.lock();
 
-	if (nodes.size() >= NODE_MIN || time > 500s
+	if (nodes.size() >= NODE_MIN || time < 100s
 		|| role == UDP_NONE) {
 		mute.unlock();
 		return;
 	}
 
 	ping = system_clock::now();
-	mute.unlock();
+
+	if (nodes.size() >= NODE_MIN) {
+		mute.unlock();
+		return;
+	}
 
 	if (role == UDP_NODE) {
+		mute.unlock();
 		this->from_clients();
-		return;
+
+		if (nodes.size() > 5) {
+			return;
+		}
 	}
 
-	if (structs::nodes.size() >= NODE_MIN) {
-		return;
-	}
+	mute.unlock();
 
-	msg.tmp(USER_REQ_NODE);
+	msg.tmp((role == UDP_USER) ? USER_REQ_NODE
+							   : NODE_REQ_NODE);
+
 	storage::tasks.add(msg, sddr_get(father.info.ipp),
 	                   father.info.hash);
 }
@@ -149,11 +162,9 @@ void nodes_handler::from_clients(void) {
 			break;
 		}
 
-		if (!p.is_node) {
-			continue;
+		if (p.is_node) {
+			this->add(p.hash, p.ipp.ip);
 		}
-
-		this->add(p.hash, p.ipp.ip);
 	}
 
 	storage::clients.mute.unlock();

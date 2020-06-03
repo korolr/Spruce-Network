@@ -1,10 +1,6 @@
 
 #include "../../include/storage.hpp"
 
-tunnels_handler::tunnels_handler(void) {
-	st.sddr.sin_addr.s_addr = INADDR_ANY;
-	st.sddr.sin_family = AF_INET;
-}
 void tunnels_handler::add(unsigned char *target,
 						  unsigned char *from,
 						  struct init_data init) {
@@ -46,9 +42,9 @@ void tunnels_handler::add(unsigned char *target,
 
 	assert(one = new tunnel());
 
-	memcpy(one->target, target, HASHSIZE);
-	memcpy(one->from, from, HASHSIZE);
 	one->time = system_clock::now();
+	HASHCPY(one->target, target);
+	HASHCPY(one->from, from);
 	one->length = 0;
 
 	structs::tunnels.push_back(one);
@@ -117,13 +113,13 @@ size_t tunnels_handler::free_port(void) {
 
 bool tunnels_handler::sys_freeport(size_t port) {
 	int tsock = socket(AF_INET, SOCK_STREAM, 0);
+	socklen_t sz = sizeof(struct sockaddr_in);
 	bool status;
 
-	socklen_t sz = sizeof(struct sockaddr_in);
 	st.sddr.sin_port = htons(port);
 
 	status = bind(tsock, st.ptr, sz) == 0;
-	socket_close(tsock);
+	CLOSE_SOCKET(tsock);
 
 	return status;
 }

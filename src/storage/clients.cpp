@@ -4,10 +4,12 @@
 void clients_handler::reg(unsigned char *hash,
 						  struct ipport ipp,
 						  enum udp_role role) {
+	using structs::keys;
+
 	bool is_node = false;
 	struct client one;
 	
-	if (!hash || role == UDP_NONE) {
+	if (!hash || role == UDP_NONE || IS_ME(hash)) {
 		return;
 	}
 
@@ -22,15 +24,15 @@ void clients_handler::reg(unsigned char *hash,
 			continue;
 		}
 
-		memcpy(p.hash, hash, HASHSIZE);
 		p.ping = system_clock::now();
+		HASHCPY(p.hash, hash);
 		p.is_node = is_node;
 		mute.unlock();
 		return;
 	}
 
-	memcpy(one.hash, hash, HASHSIZE);
 	one.ping = system_clock::now();
+	HASHCPY(one.hash, hash);
 	one.is_node = is_node;
 	one.ipp = ipp;
 
@@ -112,6 +114,44 @@ void clients_handler::check(void) {
 	}
 
 	mute.unlock();
+}
+/*********************************************************/
+bool clients_handler::exists(unsigned char *hash) {
+	bool status = false;
+
+	mute.lock();
+
+	for (auto &p : structs::clients) {
+		if (memcmp(p.hash, hash, HASHSIZE) != 0) {
+			continue;
+		}
+
+		status = true;
+		break;
+	}
+
+	mute.unlock();
+	return status;
+}
+/*********************************************************/
+bool clients_handler::find(unsigned char *hash,
+						   struct client &one) {
+	bool status = false;
+
+	mute.lock();
+
+	for (auto &p : structs::clients) {
+		if (memcmp(p.hash, hash, HASHSIZE) != 0) {
+			continue;
+		}
+
+		status = true;
+		one = p;
+		break;
+	}
+
+	mute.unlock();
+	return status;
 }
 /*********************************************************/
 #if defined(DEBUG) && DEBUG == true

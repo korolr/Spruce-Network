@@ -10,7 +10,7 @@ void tcp_tunnel::init(struct init_data initd,
 		return;
 	}
 
-	memcpy(ehash, initd.hash, HASHSIZE);
+	HASHCPY(ehash, initd.hash);
 	it = ptr;
 
 	switch (initd.type) {
@@ -44,7 +44,7 @@ tcp_tunnel::~tcp_tunnel(void) {
 		storage::msgs.done(msg.id);
 	}
 
-	socket_close(sock);
+	CLOSE_SOCKET(sock);
 	work = false;
 }
 
@@ -69,11 +69,10 @@ void tcp_tunnel::sender(enum tcp_role r, struct ipport ipp) {
 		}
 	}
 
-	assert(ipp.port != 0);
-	assert((sock = this->tcp_socket(TIMEOUT)) != 0);
+	sock = new_socket(SOCK_STREAM, TIMEOUT);
+	assert(ipp.port != 0 && sock != 0);
 
-	this->set_sockaddr(srv.sddr, ipp.port);
-	srv.sddr.sin_addr.s_addr = inet_addr(ipp.ip.c_str());
+	set_sockaddr(srv.sddr, ipp.port, ipp.ip);
 	s_port = ipp.port;
 
 	it->time = system_clock::now();
@@ -110,10 +109,10 @@ void tcp_tunnel::receiver(enum tcp_role r, size_t port) {
 	char *name = nullptr;
 	int csock = 0;
 
-	assert(port != 0);
-	assert((sock = this->tcp_socket(TIMEOUT)) != 0);
+	sock = new_socket(SOCK_STREAM, TIMEOUT);
+	assert(port != 0 && sock != 0);
 
-	this->set_sockaddr(srv.sddr, port);
+	set_sockaddr(srv.sddr, port);
 
 	it->mute.lock();
 	it->status = TUNNEL_1;
@@ -187,7 +186,7 @@ void tcp_tunnel::receiver(enum tcp_role r, size_t port) {
 				l = recv(s, b, PACKLEN, 0);
 				this->recv_processing(b, s, l);
 			}
-			socket_close(s);
+			CLOSE_SOCKET(s);
 		}, 
 		csock);
 }
@@ -382,37 +381,4 @@ void tcp_tunnel::get_content(void) {
 	}
 
 	// from file --------------------------------------------
-}
-
-
-
-int tcp_tunnel::tcp_socket(size_t time) {
-	int sol = SOL_SOCKET, opt, new_sock;
-	struct timeval timeout;
-	char *t_opt;
-
-	if ((new_sock = socket(AF_INET, SOCK_STREAM, 0)) == 0) {
-		return 0;
-	}
-
-	t_opt = reinterpret_cast<char *>(&timeout);
-	timeout.tv_sec = time;
-	opt = sizeof(timeout);
-	timeout.tv_usec = 0;
-
-	setsockopt(new_sock, sol, SO_RCVTIMEO, t_opt, opt);
-	setsockopt(new_sock, sol, SO_SNDTIMEO, t_opt, opt);
-
-	return new_sock;
-}
-
-
-
-
-void tcp_tunnel::set_sockaddr(struct sockaddr_in &sddr,
-	size_t port) {
-
-	sddr.sin_addr.s_addr = INADDR_ANY;
-	sddr.sin_port = htons(port);
-	sddr.sin_family = AF_INET;
 }

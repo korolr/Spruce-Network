@@ -31,6 +31,9 @@ class pack {
 		bool is_correct(void);
 		size_t cookie(void);
 		size_t is_req(void);
+#if defined(DEBUG) && DEBUG == true
+		void debug(void);
+#endif
 };
 
 #endif

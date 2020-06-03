@@ -1,14 +1,10 @@
 
 #include "../include/network.hpp"
 
-udp_network::udp_network(void) {
-	recv.sddr.sin_addr.s_addr = INADDR_ANY;
-	recv.sddr.sin_port = htons(UDP_PORT);
-	recv.sddr.sin_family = AF_INET;
-}
-
 void udp_network::start(void) {
-	if ((sock = this->udp_socket(TIMEOUT)) == 0) {
+	sock = new_socket(SOCK_DGRAM, TIMEOUT);
+
+	if (sock == 0) {
 		cout << "[E]: Can't create new socket.\n";
 		return;
 	}
@@ -26,7 +22,44 @@ void udp_network::start(void) {
 		work = false;
 	}
 }
+/*********************************************************/
+void udp_network::processing(struct sockaddr_in sddr,
+							 pack msg) {
+	THREAD_START();
 
+	{
+		using storage::clients;
+
+		switch (structs::role) {
+		case UDP_NODE:
+			/**
+			*	If the received packet is a request -
+			*	register the user with us.
+			*/
+			if (msg.is_req()) {
+				clients.reg(msg.hash(), ipport_get(sddr),
+							msg.role());
+			}
+
+			handler::node(msg, sddr);
+			break;
+
+		case UDP_USER:
+			handler::user(msg, sddr);
+			break;
+
+		default:
+			if (msg.type() != RES_ROLE) {
+				break;
+			}
+
+			handler::role(msg, sddr);
+		}
+	}
+
+	THREAD_END();
+}
+/*********************************************************/
 void udp_network::send_thread(void) {
 	using structs::father;
 	using storage::tasks;
@@ -41,7 +74,7 @@ void udp_network::send_thread(void) {
 		/**
 		*	Checking the paternal node.
 		*/
-		if (time - father.info.ping > 10s && father.status) {
+		if (time - father.info.ping > 15s && father.status) {
 			storage::father.no_father();
 			tasks.renew();
 			continue;
@@ -101,8 +134,7 @@ void udp_network::recv_thread(void) {
 		rs = recvfrom(sock, buff, p_sz, 0x100, cln.ptr, &sz);
 		msg = pack(buff, rs);
 
-		if (rs < UDP_PACK + crypto_box_SEALBYTES
-			|| !msg.is_correct()) {
+		if (rs < UDP_PACK || !msg.is_correct()) {
 			memset(buff, 0x00, p_sz);
 			continue;
 		}
@@ -115,60 +147,4 @@ void udp_network::recv_thread(void) {
 		memset(buff, 0x00, p_sz);
 	}
 }
-/*********************************************************/
-void udp_network::processing(struct sockaddr_in sddr,
-							 pack msg) {
-	THREAD_START();
 
-	{
-		using storage::clients;
-
-		switch (structs::role) {
-		case UDP_NODE:
-			/**
-			*	If the received packet is a request -
-			*	register the user with us.
-			*/
-			if (msg.is_req()) {
-				clients.reg(msg.hash(), ipport_get(sddr),
-							msg.role());
-			}
-
-			handler::node(msg, sddr);
-			break;
-
-		case UDP_USER:
-			handler::user(msg, sddr);
-			break;
-
-		default:
-			if (msg.type() != RES_ROLE) {
-				break;
-			}
-
-			handler::role(msg, sddr);
-		}
-	}
-
-	THREAD_END();
-}
-/*********************************************************/
-int udp_network::udp_socket(size_t time) {
-	int sol = SOL_SOCKET, opt, new_sock;
-	struct timeval timeout;
-	char *t_opt;
-
-	if ((new_sock = socket(AF_INET, SOCK_DGRAM, 0)) == 0) {
-		return 0;
-	}
-
-	t_opt = reinterpret_cast<char *>(&timeout);
-	timeout.tv_sec = time;
-	opt = sizeof(timeout);
-	timeout.tv_usec = 0;
-
-	setsockopt(new_sock, sol, SO_RCVTIMEO, t_opt, opt);
-	setsockopt(new_sock, sol, SO_SNDTIMEO, t_opt, opt);
-
-	return new_sock;
-}

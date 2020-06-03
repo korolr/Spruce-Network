@@ -30,11 +30,9 @@ class tcp_tunnel {
 		int sock;
 
 		void recv_processing(unsigned char *, int, size_t);
-		void set_sockaddr(struct sockaddr_in &, size_t);
 		void sender(enum tcp_role, struct ipport);
 		void send_processing(enum tcp_status);
 		void receiver(enum tcp_role, size_t);
-		int tcp_socket(size_t);
 		void get_content(void);
 		void thr_send(void);
 

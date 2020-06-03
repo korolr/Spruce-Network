@@ -15,9 +15,9 @@ size_t messages_handler::add_bytes(unsigned char *hash,
 	assert(one.data.buff);
 
 	memcpy(one.data.buff, bytes, size);
-	memcpy(one.hash, hash, HASHSIZE);
 	one.time = system_clock::now();
 	one.id = this->free_id();
+	HASHCPY(one.hash, hash);
 	one.data.size = size;
 	one.attempts = 0;
 	one.done = false;
@@ -35,10 +35,10 @@ size_t messages_handler::add_file(unsigned char *hash,
 
 	assert(hash && name.length() > 4);
 
-	memcpy(one.hash, hash, HASHSIZE);
 	one.time = system_clock::now();
 	one.id = this->free_id();
 	one.data.buff = nullptr;
+	HASHCPY(one.hash, hash);
 	one.data.name = name;
 	one.data.ssize = 0;
 	one.data.size = 0;
@@ -210,7 +210,7 @@ void messages_handler::check(void) {
 
 		// Пытаемся повторно отправить сообщение
 		// если оно не получило статуса доставленно
-		memcpy(info, msgs[i].hash, HASHSIZE);
+		HASHCPY(info, msgs[i].hash);
 
 		msg.tmp(type);
 		msg.set_info(info, HASHSIZE * 2);
