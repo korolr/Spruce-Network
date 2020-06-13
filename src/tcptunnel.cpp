@@ -1,9 +1,7 @@
 #include "../include/spruce.hpp" //// just add spruce?????????
 #include "../include/storage.hpp"
 
-#define NORMAL_STATUS(c) ((c) >= TUNNEL_1 && (c) <= ERROR_T)
-
-void tcp_tunnel::init(struct init_data initd,
+void tcp_tunnel::init(struct init_tunnel initd,
 					  struct tunnel *ptr) {
 	if (!initd.hash || !ptr) {
 		work = false;
@@ -27,55 +25,22 @@ void tcp_tunnel::init(struct init_data initd,
 }
 
 tcp_tunnel::~tcp_tunnel(void) {
-	if (thr.joinable()) {
-		thr.join();
-	}
-
-	if (sfd.is_open()) {
-		sfd.close();
-	}
-
-	if (role == TCP_TARGET) {
-		recvd.fd.close();
-		storage::inbox.add(it->target, recvd.name);
-	}
-
-	if (role == TCP_SENDER) {
-		storage::msgs.done(msg.id);
-	}
-
+	if (thr.joinable()) { thr.join(); }
 	CLOSE_SOCKET(sock);
 	work = false;
 }
 
 
 void tcp_tunnel::sender(enum tcp_role r, struct ipport ipp) {
-	using storage::msgs;
-
 	socklen_t sz = sizeof(struct sockaddr_in);
 	auto time = system_clock::now();
 
-	if (r == TCP_SENDER
-		&& !msgs.find_hash(it->target, msg)) {
-		work = false;
-		return;
-	}
-
-	if (!msg.data.buff) {
-		sfd.open(msg.data.name, ios::binary | ios::out);
-		if (!sfd.good()) {
-			work = false;
-			return;
-		}
-	}
-
-	sock = new_socket(SOCK_STREAM, TIMEOUT);
+	sock = new_socket(SOCK_STREAM,  TIMEOUT);
+	set_sockaddr(srv.sddr, ipp.port, ipp.ip);
 	assert(ipp.port != 0 && sock != 0);
 
-	set_sockaddr(srv.sddr, ipp.port, ipp.ip);
-	s_port = ipp.port;
-
 	it->time = system_clock::now();
+	s_port = ipp.port;
 	role = r;
 
 	while (connect(sock, srv.ptr, sz) < 0) {
@@ -106,7 +71,6 @@ void tcp_tunnel::sender(enum tcp_role r, struct ipport ipp) {
 void tcp_tunnel::receiver(enum tcp_role r, size_t port) {
 	socklen_t sz = sizeof(struct sockaddr_in);
 	auto time = system_clock::now();
-	char *name = nullptr;
 	int csock = 0;
 
 	sock = new_socket(SOCK_STREAM, TIMEOUT);
@@ -150,15 +114,9 @@ void tcp_tunnel::receiver(enum tcp_role r, size_t port) {
 
 	switch (r) {
 	case TCP_TARGET:
-		assert(name = tmpnam(nullptr));
-		recvd.name = string(name);
-		recvd.fd.open(recvd.name, ios::binary
-								  | ios::in
-								  | ios::app);
-		assert(recvd.fd.is_open());
-		it->status = TUNNEL_3;
-		delete[] name;
-		break;
+		work = false;
+		it->mute.unlock();
+		return;
 
 	case TCP_BINDER1:
 		it->status = TUNNEL_1;
@@ -194,10 +152,23 @@ void tcp_tunnel::receiver(enum tcp_role r, size_t port) {
 
 void tcp_tunnel::thr_send(void) {
 	enum tcp_status st = CUR_STATUS, r_st = ERROR_T;
+	bool bin2;
 	size_t len;
 
+	bin2 = role == TCP_BINDER2 || role == TCP_UBINDER;
+	// Мы меняем текущий статус так как конечный
+	// пользователь был подключен.
+	if (bin2) {
+		it->mute.lock();
+		it->status = TUNNEL_3;
+		it->mute.unlock();
+	}
+
 	while (work) {
-		send(sock, &st, 1, 0);
+		if (bin2) {
+			this->send_processing(TUNNEL_3, bin2);
+			continue;
+		}
 
 		if ((len = recv(sock, &r_st, 1, 0)) == 0) {
 			it->mute.lock();
@@ -216,7 +187,8 @@ void tcp_tunnel::thr_send(void) {
 			return;
 		}
 
-		if (!NORMAL_STATUS(r_st)) {
+		if (send(sock, &st, 1, 0) == -1
+			|| !NORMAL_STATUS(r_st))  {
 			it->mute.lock();
 			it->status = ERROR_T;
 			it->mute.unlock();
@@ -224,7 +196,7 @@ void tcp_tunnel::thr_send(void) {
 			return;
 		}
 
-		this->send_processing(r_st);
+		this->send_processing(r_st, bin2);
 	}
 }
 
@@ -237,7 +209,8 @@ void tcp_tunnel::thr_send(void) {
 
 
 
-void tcp_tunnel::recv_processing(unsigned char *buff, int csock,
+void tcp_tunnel::recv_processing(unsigned char *buff,
+								 int csock,
 								 size_t len) {
 	unsigned char st;
 
@@ -264,7 +237,11 @@ void tcp_tunnel::recv_processing(unsigned char *buff, int csock,
 		it->mute.lock();
 		st = (it->length == 0) ? it->status
 							   : WAIT_SEND;
-		send(sock, &st, 1, 0);
+		if (send(sock, &st, 1, 0) == -1) {
+			it->status = ERROR_T;
+			work = false;
+		}
+
 		it->mute.unlock();
 		return;
 	}
@@ -279,16 +256,9 @@ void tcp_tunnel::recv_processing(unsigned char *buff, int csock,
 	}
 
 	it->mute.lock();
-
-	if (role == TCP_TARGET) {
-		recvd.fd.write(reinterpret_cast<char *>(buff), len);
-	}
-	else {
-		memcpy(it->content, buff, len);
-		it->length = len;
-	}
-
+	memcpy(it->content, buff, len);
 	it->time = system_clock::now();
+	it->length = len;
 	it->mute.unlock();
 }
 
@@ -299,9 +269,9 @@ void tcp_tunnel::recv_processing(unsigned char *buff, int csock,
 
 
 
-void tcp_tunnel::send_processing(enum tcp_status status) {
-
-	if (it->status != status) {
+void tcp_tunnel::send_processing(enum tcp_status status,
+								 bool is_bin2) {
+	if (it->status != status && !is_bin2) {
 		it->mute.lock();
 		it->time = system_clock::now();
 		it->status = status;
@@ -317,10 +287,7 @@ void tcp_tunnel::send_processing(enum tcp_status status) {
 		return;
 	}
 
-	this->get_content();
-
 	switch (it->status) {
-	case ERROR_D:
 	case ERROR_S:
 	case ERROR_T:
 		work = false;
@@ -336,7 +303,14 @@ void tcp_tunnel::send_processing(enum tcp_status status) {
 			return;
 		}
 
-		send(sock, it->content, it->length, 0);
+		if (send(sock, it->content, it->length, 0) == -1) {
+			it->mute.lock();
+			it->status = ERROR_T;
+			it->mute.unlock();
+			work = false;
+			return;
+		}
+
 		it->mute.lock();
 		it->length = 0;
 		it->mute.unlock();
@@ -348,37 +322,4 @@ void tcp_tunnel::send_processing(enum tcp_status status) {
 		it->mute.unlock();
 		work = false;
 	}
-}
-
-
-void tcp_tunnel::get_content(void) {
-	size_t ssize = msg.data.ssize;
-	size_t msize = msg.data.size;
-	size_t nsize = msize - ssize;
-	
-	if (role != TCP_SENDER) {
-		return;
-	}
-
-	assert(msg.data.buff);
-	it->mute.lock();
-
-	if (msg.data.size > 0) {
-		if (nsize == 0) {
-			it->status = ERROR_D;
-			it->mute.unlock();
-			return;
-		}
-
-		nsize = (nsize >= PACKLEN) ? PACKLEN
-								   : nsize;
-		memcpy(it->content, msg.data.buff
-			   + ssize, nsize);
-		msg.data.ssize += nsize;
-		it->length = nsize;
-		it->mute.unlock();
-		return;
-	}
-
-	// from file --------------------------------------------
 }

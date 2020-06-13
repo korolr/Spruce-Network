@@ -67,7 +67,10 @@ enum udp_type : unsigned char {
 	USER_REQ_NODE	= 0x07,
 	USER_RES_NODE	= 0x08,
 
-	USER_END		= 0x09,
+	USER_REQ_FIND	= 0x09,
+	USER_RES_FIND	= 0x0a,
+
+	USER_END		= 0x0b,
 	/**
 	*	Types of node package.
 	*/
@@ -99,6 +102,13 @@ struct sddr_structs {
 	sddr_structs(void) {
 		ptr = reinterpret_cast<struct sockaddr *>(&sddr);
 	}
+};
+
+struct hashport {
+	unsigned char hash[HASHSIZE];
+	size_t port;
+
+	hashport(void) : port(0) { }
 };
 
 struct ipport {
@@ -149,30 +159,23 @@ struct route {
 	bool full;
 };
 
-struct recvmsg {
-	time_point<system_clock> time;
-	string hash, file;
-	size_t id;
-};
-
 enum udp_role : unsigned char {
 	UDP_NONE		= 0x00,
 	UDP_NODE		= 0x01,
 	UDP_USER		= 0x02
 };
 
-struct tcp_message {
+struct msg {
 	time_point<system_clock> time;
 	unsigned char hash[HASHSIZE];
-	size_t attempts, id;
-
-	struct {
-		unsigned char *buff;
-		size_t size, ssize;
-		string name;
-	} data;
-
+	size_t attempts;
 	bool done;
+};
+
+struct find {
+	time_point<system_clock> time;
+	unsigned char hash[HASHSIZE];
+	size_t status;
 };
 
 enum tcp_status : unsigned char {
@@ -184,9 +187,8 @@ enum tcp_status : unsigned char {
 	CUR_STATUS		= 0x04,
 	WAIT_SEND		= 0x05,
 
-	ERROR_D			= 0x06, // Sending is done, just close connection.
-	ERROR_S			= 0x07, // Status error, it wasn't updated more than 15s.
-	ERROR_T			= 0x08  // Tunnel error, if one of 2 threads isn't working.
+	ERROR_S			= 0x06, // Status error, it wasn't updated more than 15s.
+	ERROR_T			= 0x07  // Tunnel error, if one of 2 threads isn't working.
 };
 
 enum tcp_role : unsigned char {
@@ -226,17 +228,21 @@ struct tunnel {
 
 namespace structs {
 	inline atomic<size_t>				threads = 0;
-	inline vector<struct tcp_message>	msgs;
 	inline vector<struct tunnel *>		tunnels;
-	inline vector<struct udp_task>		tasks;
 	inline vector<struct client>		clients;
 	inline vector<struct dadreq>		dadreqs;
-	inline vector<struct recvmsg>		inbox;
+	inline vector<struct udp_task>		tasks;
 	inline vector<struct client>		nodes;
 	inline vector<struct route>			routes;
 	inline struct udp_father			father;
 	inline struct keypair				keys;
 	inline enum udp_role				role;
+
+	namespace api {
+		inline vector<struct hashport>	inbox;
+		inline vector<struct find>		finds;
+		inline vector<struct msg>		msgs;
+	}
 }
 
 bool
@@ -267,7 +273,25 @@ int
 new_socket(int, size_t);
 
 void
-set_sockaddr(struct sockaddr_in &, size_t port = 0, string ip = "");
+set_sockaddr(struct sockaddr_in &,
+			 size_t port = 0,
+			 string ip = "");
+
+class userapi {
+	private:
+		static unsigned char *
+		ibox_req(unsigned char *, size_t &);
+
+		static unsigned char *
+		find_req(unsigned char *, size_t &);
+
+		static unsigned char *
+		pack_req(unsigned char *, size_t &);
+
+	public:
+		static unsigned char *
+		processing(unsigned char *, size_t &);
+};
 
 #define THREAD_START()												\
 	if (structs::threads >= PACKLIM) {								\
@@ -284,6 +308,9 @@ set_sockaddr(struct sockaddr_in &, size_t port = 0, string ip = "");
 
 #define IS_ME(key)													\
 	(memcmp((key), structs::keys.pub, HASHSIZE) == 0)
+
+#define IS_FATHER(key)												\
+	(memcmp((key), structs::father.info.hash, HASHSIZE) == 0)
 
 #define CLOSE_SOCKET(s)												\
 	if ((s) != 0) {													\

@@ -14,9 +14,10 @@ void routes_handler::set(bool full, unsigned char *hash,
 			continue;
 		}
 
+		exists = true;
+
 		if (full) {
 			if (p.full) {
-				exists = true;
 				break;
 			}
 
@@ -24,8 +25,6 @@ void routes_handler::set(bool full, unsigned char *hash,
 			HASHCPY(one.father, father);
 			p.full = true;
 			p.ipp = ipp;
-
-			exists = true;
 			break;
 		}
 	}
@@ -65,6 +64,10 @@ void routes_handler::update(unsigned char *hash,
 			continue;
 		}
 
+		if ((*it).full) {
+			break;
+		}
+
 		found = true;
 		break;
 	}
@@ -82,7 +85,7 @@ void routes_handler::update(unsigned char *hash,
 	mute.unlock();
 }
 /*********************************************************/
-bool routes_handler::find(unsigned char *hash,
+/*bool routes_handler::find(unsigned char *hash,
 						  struct route &one) {
 	bool found = false;
 
@@ -102,6 +105,47 @@ bool routes_handler::find(unsigned char *hash,
 
 	mute.unlock();
 	return found;
+}*/
+bool routes_handler::exists(unsigned char *hash) {
+	bool found = false;
+
+	mute.lock();
+
+	for (auto &p : structs::routes) {
+		if (memcmp(p.hash, hash, HASHSIZE) == 0
+			&& p.full) {
+			found = true;
+			break;
+		}
+	}
+
+	mute.unlock();
+	return found;
+}
+/*********************************************************/
+bool routes_handler::find(unsigned char *hash,
+						  vector<struct route>::iterator &it) {
+	vector<struct route>::iterator i;
+	bool found = false;
+
+	assert(hash);
+
+	i = structs::routes.begin();
+	mute.lock();
+
+	for (; i != structs::routes.end(); i++) {
+		if (memcmp((*i).hash, hash, HASHSIZE) != 0
+			|| !(*i).full) {
+			continue;
+		}
+
+		found = true;
+		it = i;
+		break;
+	}
+
+	mute.unlock();
+	return found;
 }
 /*********************************************************/
 void routes_handler::rm_hash(unsigned char *hash) {
@@ -116,7 +160,7 @@ void routes_handler::rm_hash(unsigned char *hash) {
 	for (; it != structs::routes.end(); it++) {
 		cmp = memcmp((*it).hash, hash, HASHSIZE);
 
-		if (cmp != 0) {
+		if (cmp != 0 || !(*it).full) {
 			continue;
 		}
 

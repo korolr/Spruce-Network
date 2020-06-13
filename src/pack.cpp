@@ -86,7 +86,7 @@ enum udp_role pack::role(void) {
 }
 /*********************************************************/
 void pack::set_info(unsigned char *info, size_t len) {
-	assert(info && len > 0);
+	assert(info && len != 0);
 	memcpy(buffer + 5 + HASHSIZE, info, len);
 }
 /*********************************************************/
@@ -193,11 +193,13 @@ struct udp_task pack::to_task(unsigned char *hash,
 
 void pack::debug(void) {
 	string hex;
+	//size_t cookie;
 
 	if (!correct) {
 		return;
 	}
 
+	//memcpy(&cookie, buffer + 1 + HASHSIZE, 4);
 	hex = bin2hex(UDP_PACK, buffer);
 
 	for (size_t i = 0; i < hex.length(); i++) {

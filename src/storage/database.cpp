@@ -1,7 +1,7 @@
 
 #include "../../include/storage.hpp"
 /*********************************************************/
-database_handler::database_handler(string path) {
+db_handler::db_handler(string path) {
 	db = nullptr;
 
 	if (sqlite3_open(path.c_str(), &db) != SQLITE_OK) {
@@ -12,13 +12,13 @@ database_handler::database_handler(string path) {
 	this->create_tables();
 }
 /*********************************************************/
-database_handler::~database_handler(void) {
+db_handler::~db_handler(void) {
 	if (db != nullptr) {
 		sqlite3_close(db);
 	}
 }
 /*********************************************************/
-void database_handler::create_tables(void) {
+void db_handler::create_tables(void) {
 	vector<string> query = {
 		"CREATE TABLE IF NOT EXISTS    " \
 		"`nodes` (`ip` text  NOT NULL, " \
@@ -46,7 +46,7 @@ void database_handler::create_tables(void) {
 	}
 }
 /*********************************************************/
-void database_handler::set_father(struct udp_father node) {
+void db_handler::set_father(struct udp_father node) {
 	size_t port = node.info.ipp.port;
 	string ip = node.info.ipp.ip;
 	sqlite3_stmt *rs = nullptr;
@@ -81,7 +81,7 @@ void database_handler::set_father(struct udp_father node) {
 	}
 }
 /*********************************************************/
-map<unsigned char *, string> database_handler::nodes(void) {
+map<unsigned char *, string> db_handler::nodes(void) {
 	string q = "SELECT * FROM `nodes`";
 	map<unsigned char *, string> list;
 	sqlite3_stmt *rs = nullptr;
@@ -122,7 +122,7 @@ map<unsigned char *, string> database_handler::nodes(void) {
 	return list;
 }
 /*********************************************************/
-void database_handler::rm_node(string ip) {
+void db_handler::rm_node(string ip) {
 	sqlite3_stmt *rs = nullptr;
 	string q;
 
@@ -143,7 +143,7 @@ void database_handler::rm_node(string ip) {
 	}
 }
 /*********************************************************/
-void database_handler::set_var(string name, string value) {
+void db_handler::set_var(string name, string value) {
 	sqlite3_stmt *rs = nullptr;
 	string q;
 
@@ -169,7 +169,7 @@ void database_handler::set_var(string name, string value) {
 	}
 }
 /*********************************************************/
-void database_handler::rm_var(string name) {
+void db_handler::rm_var(string name) {
 	sqlite3_stmt *rs = nullptr;
 	string q;
 
@@ -192,8 +192,8 @@ void database_handler::rm_var(string name) {
 	}
 }
 /*********************************************************/
-void database_handler::add_node(unsigned char *hash,
-								string ip) {
+void db_handler::add_node(unsigned char *hash,
+						  string ip) {
 	sqlite3_stmt *rs = nullptr;
 	string q;
 
@@ -217,7 +217,7 @@ void database_handler::add_node(unsigned char *hash,
 }
 
 
-string database_handler::get_var(string name)
+string db_handler::get_var(string name)
 {
 	sqlite3_stmt *rs = nullptr;
 	typedef unsigned char uc;
@@ -255,8 +255,8 @@ string database_handler::get_var(string name)
 	return rdata;
 }
 
-bool database_handler::get_father(unsigned char *hash,
-								  string &ip) {
+bool db_handler::get_father(unsigned char *hash,
+							string &ip) {
 	string q = "SELECT * FROM `father` LIMIT 1";
 	sqlite3_stmt *rs = nullptr;
 	typedef unsigned char uc;

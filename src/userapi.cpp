@@ -1,193 +1,113 @@
 
-#include "../include/userapi.hpp"
+#include "../include/spruce.hpp"
+#include "../include/storage.hpp"
 
-string userapi::processing(unsigned char *buff,
-						   size_t len) {
-	bool tobuff = false;
-	string data;
-	size_t slen;
-	char c;
+unsigned char *userapi::processing(unsigned char *buff,
+								   size_t &len) {
+	unsigned char *res;
 
-	if (len < 5 || len > PACKLEN || !buff) {
-		return string();
+	if (!buff || len <= HASHSIZE) {
+		len = 0;
+		return nullptr;
 	}
 
-	args.clear();
-	bsize = 0;
-
-	for (size_t i = 0; i < len; i++) {
-		slen = data.length();
-
-		if (buff[i] == ' ' && slen > 0
-			&& !tobuff) {
-			args.push_back(data);
-			continue;
-		}
-
-		if (buff[i] == '\n' && !tobuff) {
-			if (slen > 0) {
-				args.push_back(data);
-			}
-			tobuff = true;
-			continue;
-		}
-
-		if (tobuff) {
-			bytes[bsize] = buff[i];
-			bsize++;
-			continue;
-		}
-
-		memcpy(&c, buff + i, sizeof(char));
-		data.push_back(c);
+	if (structs::role == UDP_NONE) {
+		len = 0;
+		return nullptr;
 	}
 
-	if (args[0] == "inbox") {
-		return this->inbox();
-	}
-
-	if (args[0] == "newmsg") {
-		return this->newmsg();
-	}
-
-	if (args[0] == "status") {
-		return this->msgstatus();
-	}
-
-	return api_errs[0];
-}
-
-
-
-string userapi::msgstatus(void) {
-	stringstream ss;
-	size_t status;
-
-	if (args.size() != 2) {
-		return api_errs[1];
-	}
-
-	status = storage::msgs.info(stoi(args[1]));
-	ss << "{\"error\" : false, \"status\" : ";
-	ss << status;
-	ss << "}";
-
-	return ss.str();
-}
-
-
-
-
-string userapi::inbox(void) {
-	map<string, string>::iterator it;
-	map<string, string> list;
-	string line;
-
-	if (args.size() != 0) {
-		return api_errs[2];
-	}
-
-	line = "{\"error\" : false, \"list\" : [";
-	list = storage::inbox.list();
-
-	for (it = list.begin(); it != list.end(); it++) {
-		line += "{\"hash\" : \"" + it->first + "\", ";
-		line += "\"file\" : \"" + it->second + "\"},";
-	}
-
-	line.pop_back();
-	return (line += "]}");
-}
-
-
-
-
-string userapi::newmsg(void) {
-	using storage::msgs;
-
-	size_t size = args.size();
-	string res = api_errs[9];
-	unsigned char *hash;
-	size_t hs = HASHSIZE * 2;
-
-	if (size != 3 && size != 4) {
-		return api_errs[3];
-	}
-
-	if (args[1].size() != hs) {
-		return api_errs[4];
-	}
-
-	hash = hex2bin(hs, args[1]);
-	assert(hash);
-
-	switch (stoi(args[2])) {
-	case 0: {
-		if (bsize < 1) {
-			res = api_errs[5];
-			break;
-		}
-
-		msgs.add_bytes(hash, bytes, bsize);
+	switch (*buff) {
+	case 0x00:
+		res = userapi::find_req(buff, len);
 		break;
-	}
 
-	case 1: {
-		if (size != 4) {
-			res = api_errs[6];
-			break;
-		}
-
-		ofstream fd(args[3]);
-
-		if (!fd.good()) {
-			res = api_errs[7];
-			break;
-		}
-
-		fd.close();
-		msgs.add_file(hash, args[3]);
+	case 0x01:
+		res = userapi::pack_req(buff, len);
 		break;
-	}
+
+	case 0x02:
+		res = userapi::ibox_req(buff, len);
+		break;
 
 	default:
-		res = api_errs[8];
+		res = nullptr;
+		len = 0;
 	}
-
-	if (hash) { delete[] hash; }
 
 	return res;
 }
 
-/*
-sendmsg dsfgsdfgh454h54h file(1)/bytes(0)
-*bytecoode*
+unsigned char *userapi::find_req(unsigned char *buff,
+								 size_t &len) {
+	using structs::father;
+	using structs::role;
 
-{"error" : 0}
+	unsigned char *res, c;
+	pack msg;
 
+	assert(res = new unsigned char[HASHSIZE + 1]);
+	len = HASHSIZE + 1;
 
+	msg.tmp((role == UDP_NODE) ? NODE_REQ_FIND
+							   : USER_REQ_FIND);
+	msg.set_info(buff + 1, HASHSIZE);
 
-msgstatus *num*
+	storage::tasks.add(msg, sddr_get(father.info.ipp),
+					   father.info.hash);
+	storage::finds.add(buff + 1);
 
-{"status" : 0, "error" : 0}
+	size_t status = storage::finds.check(buff + 1);
+	c = status;
 
+	memcpy(res + HASHSIZE, &c, 1);
+	HASHCPY(res, buff + 1);
 
-inbox
-
-[
-	{"from" : "sfdg45g4g4gsdfg", "file" : "/tmp/file23f54g"},
-	{"from" : "sfdg45g4g4gsdfg", "file" : "/tmp/file23f54g"},
-	{"from" : "sfdg45g4g4gsdfg", "file" : "/tmp/file23f54g"},
-	{"from" : "sfdg45g4g4gsdfg", "file" : "/tmp/file23f54g"}
-]
-
-{
-	"error" : 0,
-	"list" : [
-		{"aa":"sdfsdf","bb":"bb"},
-		{"aa":"sdfsdf","bb":"bb"},
-		{"aa":"sdfsdf","bb":"bb"},
-		{"aa":"sdfsdf","bb":"bb"}
-	]
+	return res;
 }
-*/
+
+unsigned char *userapi::pack_req(unsigned char *buff,
+								 size_t &len) {
+	unsigned char *res;
+	size_t port = 0;
+
+	assert(res = new unsigned char[HASHSIZE + 4]);
+	storage::msgs.add(buff + 1);
+	len = HASHSIZE + 4;
+	port = storage::msgs.create_thread(buff + 1);
+cout << "Port: " << port << endl;
+
+	memcpy(res + HASHSIZE, &port, 4);
+	HASHCPY(res, buff + 1);
+
+	return res;
+}
+
+unsigned char *userapi::ibox_req(unsigned char *buff,
+								 size_t &len) {
+	using structs::api::inbox;
+
+	size_t size, shift = HASHSIZE + 4;
+	unsigned char *res;
+
+	storage::inbox.mute.lock();
+
+	if ((size = inbox.size()) == 0) {
+		storage::inbox.mute.unlock();
+		len = 0;
+		return nullptr;
+	}
+
+	len = (HASHSIZE + 4) * size;
+	assert(res = new unsigned char[len]);
+
+	for (size_t i = 0; i < size; i++) {
+		HASHCPY(res + (i * shift), inbox[i].hash);
+		memcpy(res + (i * shift) + HASHSIZE,
+			   &inbox[i].port, 4);
+	}
+
+	inbox.clear();
+	storage::inbox.mute.unlock();
+
+	return res;
+}

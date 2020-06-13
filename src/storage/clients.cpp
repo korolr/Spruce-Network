@@ -3,7 +3,8 @@
 /*********************************************************/
 void clients_handler::reg(unsigned char *hash,
 						  struct ipport ipp,
-						  enum udp_role role) {
+						  enum udp_role role,
+						  bool is_ping) {
 	using structs::keys;
 
 	bool is_node = false;
@@ -27,6 +28,11 @@ void clients_handler::reg(unsigned char *hash,
 		p.ping = system_clock::now();
 		HASHCPY(p.hash, hash);
 		p.is_node = is_node;
+		mute.unlock();
+		return;
+	}
+
+	if (!is_ping) {
 		mute.unlock();
 		return;
 	}
@@ -152,6 +158,25 @@ bool clients_handler::find(unsigned char *hash,
 
 	mute.unlock();
 	return status;
+}
+/*********************************************************/
+struct client clients_handler::nearest(unsigned char *hash) {
+	struct client node = structs::father.info;
+	int cmp;
+
+	mute.lock();
+
+	for (auto &p : structs::clients) {
+		cmp = storage::father.cmp(hash, p.hash, node.hash);
+
+		if (p.is_node && cmp == 1) {
+			node = p;
+			continue;
+		}
+	}
+
+	mute.unlock();
+	return node;
 }
 /*********************************************************/
 #if defined(DEBUG) && DEBUG == true

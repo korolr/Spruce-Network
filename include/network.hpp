@@ -5,6 +5,7 @@
 #include "spruce.hpp"
 #include "storage.hpp"
 #include "tcptunnel.hpp"
+#include "router.hpp"
 
 struct ret {
 	unsigned char hash[HASHSIZE];
@@ -40,56 +41,95 @@ class udp_network {
 		}
 };
 
-class father_router {
+class handler_queue {
 	private:
-		struct ret from_user(struct sockaddr_in, pack);
-		struct ret chain(struct sockaddr_in, pack);
-		struct ret iamfather(unsigned char *);
+		map<size_t, unsigned char *> queue;
+		mutex mute;
+
+		void add(size_t cookie, unsigned char *hash) {
+			unsigned char *nhash = new unsigned char[HASHSIZE];
+			assert(nhash);
+
+			HASHCPY(nhash, hash);
+
+			queue.insert(make_pair(cookie, nhash));
+		}
 
 	public:
-		struct ret req(struct sockaddr_in, pack);
-		void res(struct sockaddr_in, pack);
+		bool lock(pack &msg) {
+			map<size_t, unsigned char *>::iterator it;
+			int cmp;
+
+			mute.lock();
+
+			it = queue.find(msg.cookie());
+
+			if (it == queue.end()) {
+				this->add(msg.cookie(), msg.hash());
+				mute.unlock();
+				return false;
+			}
+
+			assert(it->second);
+			cmp = memcmp(it->second, msg.hash(), HASHSIZE);
+
+			if (cmp != 0) {
+				this->add(msg.cookie(), msg.hash());
+				mute.unlock();
+				return false;
+			}
+
+			mute.unlock();
+
+			return true;
+		}
+
+		void unlock(pack &msg) {
+			map<size_t, unsigned char *>::iterator it;
+			int cmp;
+
+			mute.lock();
+			it = queue.find(msg.cookie());
+
+			if (it == queue.end()) {
+				mute.unlock();
+				return;
+			}
+
+			assert(it->second);
+			cmp = memcmp(it->second, msg.hash(), HASHSIZE);
+
+			if (cmp != 0) {
+				mute.unlock();
+				return;
+			}
+
+			delete[] it->second;
+			queue.erase(it);
+
+			mute.unlock();
+		}
 };
 
-class nodes_router {
-	public:
-		struct ret req(struct sockaddr_in, pack);
-		void res(struct sockaddr_in, pack);
-};
-
-class tunnels_router {
-	private:
-		struct ret newtunnel(struct sockaddr_in, struct route,
-							 enum tcp_role, pack);
-		struct ret get_message(struct sockaddr_in, unsigned char *,
-							   unsigned char *, size_t);
-		struct ret find_req(unsigned char *);
-
-	public:
-		struct ret req(struct sockaddr_in, pack);
-		void res(struct sockaddr_in, pack);
-};
-
-class find_router {
-	public:
-		struct ret req(struct sockaddr_in, pack);
-		void res(struct sockaddr_in, pack);
-};
+inline udp_network network;
 
 namespace handler {
-	struct ret make_ret(struct sockaddr_in, unsigned char *, pack);
+	inline handler_queue queue;
+
+	struct ret make_ret(struct sockaddr_in,
+						unsigned char *,
+						pack);
+
 	void node(pack, struct sockaddr_in);
 	void user(pack, struct sockaddr_in);
 	void role(pack, struct sockaddr_in);
 }
 
 namespace router {
-	inline tunnels_router tunnels;
-	inline father_router father;
-	inline nodes_router nodes;
-	inline find_router find;
+	inline tunnels_router	tunnels;
+	inline father_router	father;
+	inline nodes_router		nodes;
+	inline find_router		find;
 }
-
-inline udp_network network;
 
 #endif

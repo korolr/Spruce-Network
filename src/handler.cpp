@@ -2,91 +2,95 @@
 #include "../include/network.hpp"
 /*********************************************************/
 void handler::node(pack msg, struct sockaddr_in sddr) {
-	struct ipport ipp = ipport_get(sddr);
 	unsigned char role = UDP_NODE;
 	bool ff = false;
-	struct ret resp;
-	pack response;
+	struct ret fres;
+	pack res;
 
 	if ((ff = storage::father.from_father(sddr, msg))) {
 		structs::father.info.ping = system_clock::now();
 	}
 
-	resp.empty = true;
+	if (queue.lock(msg)) {
+		return;
+	}
+
+	fres.empty = true;
 
 	switch (msg.type()) {
 	case USER_REQ_PING:
 	case NODE_REQ_PING:
-		response.tmp(NODE_RES_PING, msg.cookie());
-		storage::tasks.add(response, sddr, msg.hash());
-		return;
+		res.tmp(NODE_RES_PING,   msg.cookie());
+		fres = make_ret(sddr, msg.hash(), res);
+		break;
 
 	case NODE_RES_PING:
-		return;
+		storage::tasks.rm_cookie(msg.cookie());
+		break;
 
 	case REQ_ROLE:
-		response.tmp(RES_ROLE, msg.cookie());
+		res.tmp(RES_ROLE, msg.cookie());                    cout << "REQ_ROLE\n";
 
-		if (ipp.port == UDP_PORT) {
-			response.set_info(&role, 1);
+		if (ipport_get(sddr).port == UDP_PORT) {
+			res.set_info(&role, 1);
 		}
 		else {
 			role = UDP_USER;
-			response.set_info(&role, 1);
+			res.set_info(&role, 1);
 		}
 
-		storage::tasks.add(response, sddr, msg.hash());
-		return;
+		fres = make_ret(sddr, msg.hash(), res);
+		break;
 
 	case NODE_REQ_FATHER:
 	case USER_REQ_FATHER:
-		resp = router::father.req(sddr, msg);
+		fres = router::father.req(sddr, msg);                     //cout << "REQ_FATHER\n";
 		break;
 
 	case NODE_RES_FATHER:
-		router::father.res(sddr, msg);
+		router::father.res(sddr, msg);                           //cout << "RES_FATHER\n";
 		break;
 
+	case USER_REQ_FIND:
 	case NODE_REQ_FIND:
-		resp = router::find.req(sddr, msg);
+																cout << "REQ_FIND\n";
+		fres = router::find.req(sddr, msg);
 		break;
 
 	case USER_REQ_NODE:
 	case NODE_REQ_NODE:
-		resp = router::nodes.req(sddr, msg);
+		fres = router::nodes.req(sddr, msg);                    cout << "REQ_NODE\n";
 		break;
 
 	case NODE_RES_NODE:
-		router::nodes.res(sddr, msg);
+		router::nodes.res(sddr, msg);                           cout << "RES_NODE\n";
 		break;
 
 	case USER_REQ_TUNNEL:
 	case NODE_REQ_TUNNEL:
-		resp = router::tunnels.req(sddr, msg);
+		fres = router::tunnels.req(sddr, msg);                  cout << "REQ_TUNNEL\n";
 		break;
 
 	case NODE_RES_TUNNEL:
-		router::tunnels.res(sddr, msg);
+		router::tunnels.res(sddr, msg);                         cout << "RES_TUNNEL\n";
 		break;
 
 	case NODE_RES_FIND:
-		router::find.res(sddr, msg);
+		router::find.res(sddr, msg);                            cout << "RES_FIND\n";
 		break;
 
 	default:
 		if (ff) {
 			storage::father.no_father();
-			return;
 		}
-
-		response.tmp(RES_ROLE, msg.cookie());
-		storage::tasks.add(response, sddr, msg.hash());
-		return;
 	}
 
-	if (!resp.empty) {
-		storage::tasks.add(resp.msg, resp.sddr, resp.hash);
+	if (!fres.empty) {
+		storage::tasks.add(fres.msg, fres.sddr,
+						   fres.hash);
 	}
+
+	queue.unlock(msg);
 }
 /*********************************************************/
 void handler::user(pack msg, struct sockaddr_in sddr) {
@@ -111,6 +115,10 @@ void handler::user(pack msg, struct sockaddr_in sddr) {
 
 	case NODE_RES_TUNNEL:
 		router::tunnels.res(sddr, msg);
+		return;
+
+	case NODE_RES_FIND:
+		router::find.res(sddr, msg);
 		return;
 
 	default:

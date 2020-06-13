@@ -6,158 +6,67 @@
 /*********************************************************/
 struct ret tunnels_router::req(struct sockaddr_in sddr,
 							   pack msg) {
-	using storage::father;
-	using structs::keys;
-
-	unsigned char *hash = msg.hash();
-	unsigned char *to = msg.info();
-	struct client nclient;
-	enum tcp_role role;
-	struct route fr;
-	pack req, res;
-	bool found;
+	unsigned char *to = msg.info(), *from = to + HASHSIZE;
+	vector<struct route>::iterator it;
+	pair<size_t, size_t> ports;
+	bool exists1, exists2;
+	struct route gate;
+	pack res;
 
 	res.tmp(NODE_RES_TUNNEL, msg.cookie());
 	res.set_info(to, HASHSIZE * 2);
 
 	if (is_null(to, HASHSIZE * 2)) {
-		return handler::make_ret(sddr, hash, res);
+		return handler::make_ret(sddr, msg.hash(), res);
+	}
+
+	if (storage::tunnels.find_ports(to, from, ports)) {
+		res.add_info(HASHSIZE * 2, &ports.second, 4);
+		return handler::make_ret(sddr, msg.hash(), res);
 	}
 	/**
 	*	If the request is for us.
 	*/
 	if (IS_ME(to)) {
-		return this->get_message(sddr, to, hash,
+		if (!storage::father.from_father(sddr, msg)) {
+			return handler::make_ret(sddr, nullptr,
+									 res);
+		}
+		return this->get_message(sddr, to, msg.hash(),
 								 msg.cookie());
 	}
-	/**
-	*	If the route has already been created before, we
-	*	proceed to the generation of the TCP tunnel.
-	*/
-	if ((found = storage::routes.find(to, fr)) && fr.full) {
-		/**
-		*	If the fathe node is changed by user.
-		*/
-		if (!storage::clients.exists(to)) {
-			unsigned char error  = 0x01;
-			storage::routes.rm_hash(to);
 
-			res.add_info(HASHSIZE * 2 + 5, &error, 1);
-			return handler::make_ret(sddr, hash, res);
-		}
+	struct client client;
+	enum tcp_role role;
 
-		return this->newtunnel(sddr, fr, TCP_BINDER1, msg);
-	}
-	/**
-	*	Network user in the search process.
-	*/
-	if (found && !fr.full) {
-		return handler::make_ret(sddr, hash, res);
-	}
-	/**
-	*	If the customer you are looking for is a registered
-	*	user.
-	*/
-	if (storage::clients.find(to, nclient)) {
-		HASHCPY(fr.father, to);
-		fr.ipp = nclient.ipp;
-
-		role = (to + HASHSIZE * 2 + 4 == 0x00) ? TCP_UBINDER 
-											   : TCP_BINDER2;
-		return this->newtunnel(sddr, fr, role, msg);
-	}
-	/**
-	*	The client was not found - we create a request for
-	*	its search in the network.
-	*/
-	storage::tasks.add(res, sddr, hash);
-	return this->find_req(to);
-}
-/*********************************************************/
-struct ret tunnels_router::newtunnel(struct sockaddr_in sddr,
-									 struct route froute,
-									 enum tcp_role role,
-									 pack msg) {
-	using storage::tunnels;
-	using storage::tasks;
-
-	unsigned char *target = msg.info(), *hash;
-	unsigned char *from = target + HASHSIZE;
-	size_t port, step = HASHSIZE * 2;
-	pair<size_t, size_t> ports;
-	pack msg1, msg2;
-
-	msg1.tmp(NODE_RES_TUNNEL, msg.cookie());
-	msg1.set_info(msg.info(), step);
-	/**
-	*	Add a return route (This will help not to look
-	*	for a client, for a return answer).
-	*/
-	if (role == TCP_BINDER2) {
-		storage::routes.set(true, from, msg.hash(),
-							ipport_get(sddr));
-	}
-	/**
-	*	If this request is repeated and the tunnel has
-	*	already been created before.
-	*/
-	if (tunnels.find_ports(target, from, ports)) {
-		msg1.add_info(step, &ports.second, 4);
-
-		return handler::make_ret(sddr, msg.hash(),
-								 msg1);
+	exists1 = storage::clients.find(to, client);
+	exists2 = storage::routes.find(to, it);
+	// Если нету маршрута, сначала нужно сделать поиск!!
+	if (!exists1 && !exists2) {
+		return handler::make_ret(sddr, msg.hash(), res);
 	}
 
-	hash = (role == TCP_BINDER1) ? froute.father
-								 : froute.hash;
-	sddr = sddr_get(froute.ipp);
-	port = tunnels.free_port();
-	/**
-	*	If we are the last binder for sending a message,
-	*	we create an additional one later for sending to
-	*	the end user.
-	*/
-	if (role != TCP_BINDER1) {
-		tunnels.add(target, from, {TCP_SND, target, role,
-								  {port, froute.ipp.ip}});
+	role = (*(from + HASHSIZE + 4) == 0x00) ? TCP_UBINDER 
+											: TCP_BINDER2;
+	gate = *it;
 
-		msg2.tmp(USER_REQ_TUNNEL);
-		msg2.set_info(msg.info(), step);
-		/**
-		*	In the information to the end user, indicate
-		*	the port on which you can receive the message.
-		*/
-		msg2.add_info(step, &port, 4);
-		tasks.add(msg2, sddr, target);
-
-		port = tunnels.free_port();
+	if (exists1) {
+		HASHCPY(gate.father, client.hash);
+		//HASHCPY(gate.hash, client.hash);
+		gate.ipp = client.ipp;
 	}
 
-	tunnels.add(target, from, {TCP_RCV, hash, role,
-							  {port, ""}});
-	msg1.add_info(step, &port, 4);
-
-	tasks.add(msg1, sddr, msg.hash());
-
-	msg2.tmp(NODE_REQ_TUNNEL);
-	msg2.set_info(msg.info(), HASHSIZE * 2);
-	/**
-	*	Set the flag that the next node is the second
-	*	binder.
-	*/
-	*target = (role == TCP_BINDER1) ? 0x01 : 0x00;
-	msg2.add_info(step + 4, target, 1);
-
-	return handler::make_ret(sddr, hash, msg2);
+	return this->create_tunnel((exists2) ? TCP_BINDER1 : role,
+						sddr, gate, msg);
 }
 /*********************************************************/
 struct ret tunnels_router::get_message(struct sockaddr_in sddr,
 									   unsigned char *info,
 									   unsigned char *hash,
 									   size_t cookie) {
-	using storage::tunnels;
 	using structs::role;
 
+	struct init_tunnel init;
 	size_t port;
 	pack res;
 
@@ -171,96 +80,114 @@ struct ret tunnels_router::get_message(struct sockaddr_in sddr,
 		return handler::make_ret(sddr, nullptr, res);
 	}
 
-	tunnels.add(info, info + HASHSIZE, {TCP_RCV, hash,
-				TCP_TARGET, {port, ""}});
+	storage::inbox.add(info, port);
 
 	res.tmp((role == UDP_NODE) ? NODE_RES_TUNNEL
 							   : USER_RES_TUNNEL, cookie);
+
 	return handler::make_ret(sddr, hash, res);
 }
 /*********************************************************/
-void tunnels_router::res(struct sockaddr_in sddr,
-						 pack msg) {
-	using storage::tunnels;
+struct ret tunnels_router::create_tunnel(enum tcp_role role,
+										 struct sockaddr_in sddr,
+										 struct route gate,
+										 pack msg) {
+	using storage::routes;
+	using storage::tasks;
 
-	unsigned char *target = msg.info(), *from;
-	unsigned char *hash = msg.hash();
-	enum tcp_role role;
-	struct route one;
-	struct ret task;
+	unsigned char *to = msg.info(), *from = to + HASHSIZE;
+	size_t shift = HASHSIZE * 2;
+	struct sockaddr_in rsddr;
+	struct init_tunnel init;
 	size_t port;
-	pack req;
+	pack req, res;
+
+	res.tmp(NODE_RES_TUNNEL, msg.cookie());
+	res.set_info(to, shift);
+	/**
+	*	Add a return route (This will help not to look for a
+	*	client, for a return answer).
+	*/
+	if (role == TCP_BINDER2) {
+		routes.set(true, from, msg.hash(), ipport_get(sddr));
+	}
+
+	port = storage::tunnels.free_port();
+	rsddr = sddr_get(gate.ipp);
+
+	if (role != TCP_BINDER1) {
+		init = {TCP_SND, to, role, {port, gate.ipp.ip}};
+		storage::tunnels.add(to, from, init);
+
+		req.tmp(NODE_REQ_TUNNEL);
+		req.set_info(msg.info(), shift);
+		/**
+		*	In the information to the end user, indicate the
+		*	port on which you can receive the message.
+		*/
+		req.add_info(shift, &port, 4);
+		tasks.add(req, rsddr,  to);
+		port = storage::tunnels.free_port();
+	}
+
+	init = {TCP_RCV, gate.father, role, {port, ""}};
+	storage::tunnels.add(to, from, init);
+
+	res.add_info(shift, &port, 4);
+	tasks.add(res, sddr, msg.hash());
+
+	req.tmp(NODE_REQ_TUNNEL);
+	req.set_info(msg.info(), shift);
+	/**
+	*	Set the flag that the next node is the second binder.
+	*/
+	unsigned char flag = (role == TCP_BINDER1) ? 0x01
+											   : 0x00;
+	req.add_info(shift + 4, &flag, 1);
+	return handler::make_ret(sddr, msg.hash(), req);
+}
+/*********************************************************/
+void tunnels_router::res(struct sockaddr_in sddr, pack msg) {
+	unsigned char *to = msg.info(), *from = to + HASHSIZE;
+	vector<struct route>::iterator it;
+	struct init_tunnel init;
+	enum tcp_role role;
+	size_t port;
 
 	storage::tasks.rm_cookie(msg.cookie());
+	memcpy(&port, from + HASHSIZE, 4);
 
-	if (is_null(target + HASHSIZE * 2, 4)) {
+	if (port == 0) {
 		/**
-		*	User has not been found yet, wait.
+		*	If the route has not been made, the port value
+		*	will be 0. Ignore the answer.
 		*/
 		return;
 	}
 
-	from = target + HASHSIZE;
 	role = (*(from + HASHSIZE + 4) == 0x01) ? TCP_BINDER2
 											: TCP_BINDER1;
-	memcpy(&port, from + HASHSIZE, 4);
 	/**
-	*	If error with routing in the chain.
+	*	Игнорируем ответ от конечного клиента.
 	*/
-	if (*(from + HASHSIZE + 5) == 0x01) {
-		task = this->find_req(target);
-		storage::tasks.add(task.msg, task.sddr, task.hash);
-		return;
-	}
-
 	if (!storage::tunnels.is_freeport(port)
 		|| role == TCP_BINDER2) {
 		return;
 	}
 
-	if (storage::routes.find(target, one)) {
-		tunnels.add(target, from, {TCP_SND, hash, role,
-								  {port, one.ipp.ip}});
+	init = {TCP_SND, msg.hash(), role, {port, ""}};
+
+	if (storage::routes.find(to, it)) {
+		init.ipp.ip = it->ipp.ip;
+		storage::tunnels.add(to, from, init);
 		return;
 	}
-
-	one.ipp = ipport_get(sddr);
-	one.ipp.port = port;
 	/**
-	*	We are the initiator of the request - we
-	*	create a stream to send a message.
+	*	We are the initiator of the request - we create a
+	*	stream to send a message.
 	*/
-	tunnels.add(target, from, {TCP_SND, hash, TCP_SENDER,
-							  one.ipp});
-}
+	init.ipp.ip = ipport_get(sddr).ip;
+	init.role = TCP_SENDER;
 
-
-
-struct ret tunnels_router::find_req(unsigned char *to) {
-	using storage::father;
-
-	struct client node = structs::father.info;
-	pack msg;
-	int cmp;
-
-	msg.tmp(NODE_REQ_FIND);
-	msg.set_info(to, HASHSIZE);
-
-	storage::routes.rm_hash(to);
-	storage::routes.set(false, to, nullptr, {});
-
-	storage::clients.mute.lock();
-
-	for (auto &p : structs::clients) {
-		cmp = father.cmp(to, p.hash, node.hash);
-
-		if (p.is_node && cmp == 1) {
-			node = p;
-		}
-	}
-
-	storage::clients.mute.lock();
-
-	return handler::make_ret(sddr_get(node.ipp),
-							 node.hash, msg);
+	storage::tunnels.add(to, from, init);
 }

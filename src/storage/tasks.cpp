@@ -57,12 +57,11 @@ void tasks_handler::rm_cookie(size_t cookie) {
 	}
 
 	for (; it != structs::tasks.end(); it++) {
-		if (cookie != (*it).cookie) {
-			continue;
+		if (cookie == (*it).cookie) {
+			cout << "Rm " << it->type << "\\" << (*it).cookie << endl;
+			structs::tasks.erase(it);
+			break;
 		}
-
-		structs::tasks.erase(it);
-		break;
 	}
 
 	mute.unlock();

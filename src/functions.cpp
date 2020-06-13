@@ -31,11 +31,23 @@ struct sockaddr_in sddr_get(struct ipport ipp) {
 /*
 *	Random number generation.
 */
+///////////////////////////////////////aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 size_t random_cookie(void) {
-	mt19937 gen; 
+	/*mt19937 gen; 
 	gen.seed(time(0));
 
-	return gen();
+	return gen();*/
+	char num[4];
+	size_t n;
+
+	ifstream fd("/dev/urandom", ios::binary);
+	assert(fd.good());
+
+	fd.read(reinterpret_cast<char *>(num), 4);
+	fd.close();
+
+	memcpy(&n, num, 4);
+	return n;
 }
 /*
 *	Convert byte array to hex string.

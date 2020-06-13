@@ -26,20 +26,20 @@ void udp_network::start(void) {
 void udp_network::processing(struct sockaddr_in sddr,
 							 pack msg) {
 	THREAD_START();
-
+if ("73636d0377047b908d310572a51dc3e60fe0b410ca90991cf77fe1d0a8a27f29" == bin2hex(HASHSIZE, msg.hash())) {
+	cout << "Received: " << msg.type() << endl;
+	//msg.debug();
+}
 	{
 		using storage::clients;
 
+		bool is_ping = msg.type() == USER_REQ_PING
+					|| msg.type() == NODE_REQ_PING;
+
 		switch (structs::role) {
 		case UDP_NODE:
-			/**
-			*	If the received packet is a request -
-			*	register the user with us.
-			*/
-			if (msg.is_req()) {
-				clients.reg(msg.hash(), ipport_get(sddr),
-							msg.role());
-			}
+			clients.reg(msg.hash(), ipport_get(sddr),
+						msg.role(), is_ping);
 
 			handler::node(msg, sddr);
 			break;
@@ -65,16 +65,19 @@ void udp_network::send_thread(void) {
 	using storage::tasks;
 	using structs::role;
 
-	auto time = system_clock::now();
+	time_point<system_clock> time, ping;
 	struct sockaddr_in sddr;
 	struct udp_task task;
+	bool sendt;
 	pack msg;
+
+	ping = system_clock::now();
 
 	while ((time = system_clock::now()), work) {
 		/**
 		*	Checking the paternal node.
 		*/
-		if (time - father.info.ping > 15s && father.status) {
+		if (time - father.info.ping > 15s && father.status) {  cout << "Fuck father.\n";
 			storage::father.no_father();
 			tasks.renew();
 			continue;
@@ -86,8 +89,10 @@ void udp_network::send_thread(void) {
 		if (role == UDP_NONE && !tasks.exists(REQ_ROLE)) {
 			msg.tmp(REQ_ROLE);
 			tasks.add(msg, sddr_get(father.info.ipp),
-					  father.info.hash);
+					  father.info.hash);                      cout << "New REQ_ROLE.\n";
 		}
+
+		sendt = tasks.first(task);
 		/**
 		*	We receive a package for sending if we have
 		*	already received a role in the network.
@@ -95,14 +100,19 @@ void udp_network::send_thread(void) {
 		*	If there are no messages to send, create a
 		*	PING packet to the father node.
 		*/
-		if (!tasks.first(task) && role != UDP_NONE) {
+		if (!sendt && role != UDP_NONE
+			&& system_clock::now() - ping >= 2s) {
 			msg.tmp((role == UDP_USER) ? USER_REQ_PING
 									   : NODE_REQ_PING);
 			sddr = sddr_get(father.info.ipp);
 			task = msg.to_task(father.info.hash, &sddr);
+			ping = system_clock::now();
+			sendt = true;
 		}
 
-		this->send_package(task);
+		if (sendt) {
+			this->send_package(task);
+		}
 	}
 }
 /*********************************************************/
@@ -114,7 +124,17 @@ void udp_network::send_package(struct udp_task task) {
 	size = sizeof(struct sockaddr_in);
 	task.sddr.sin_family = AF_INET;
 
-	sendto(sock, task.buff, task.len, 0x100, ptr, size);
+	int aa = sendto(sock, task.buff, task.len, 0x100, ptr, size);
+
+	if (aa == -1) {
+		// Добавить пакет снова в список заданий если это ответ!
+		//this_thread::sleep_for(1s);
+		cout << "sendto error\n";
+	}
+
+	if (task.type == USER_REQ_FIND) {
+		cout << "sent USER_REQ_FIND\n";
+	}
 }
 /*********************************************************/
 void udp_network::recv_thread(void) {
@@ -135,6 +155,7 @@ void udp_network::recv_thread(void) {
 		msg = pack(buff, rs);
 
 		if (rs < UDP_PACK || !msg.is_correct()) {
+			cout << "Incorrect from (" << rs << "): " << ipport_get(cln.sddr).ip << endl;
 			memset(buff, 0x00, p_sz);
 			continue;
 		}
