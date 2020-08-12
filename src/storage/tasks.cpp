@@ -5,10 +5,13 @@ void tasks_handler::add(pack msg, struct sockaddr_in sddr,
 						unsigned char *hash) {
 	struct udp_task task;
 
-	if (!msg.is_correct() || !hash) {
+	assert(hash);
+
+	if (!msg.is_correct()) {
 		return;
 	}
-
+	
+	//task.search_id = byte_sum(hash, HASHSIZE);
 	task = msg.to_task(hash, &sddr);
 	task.time = system_clock::now();
 	HASHCPY(task.hash, hash);
@@ -17,48 +20,21 @@ void tasks_handler::add(pack msg, struct sockaddr_in sddr,
 	mute.lock();
 	structs::tasks.push_back(task);
 	mute.unlock();
-}
-/*********************************************************/
-void tasks_handler::rm_hash(unsigned char *hash,
-							size_t cookie) {
-	vector<struct udp_task>::iterator it;
-	int cmp;
 
-	mute.lock();
-	it = structs::tasks.begin();
-
-	if (structs::tasks.size() == 0) {
-		mute.unlock();
-		return;
-	}
-
-	for (; it != structs::tasks.end(); it++) {
-		cmp = memcmp((*it).hash, hash, HASHSIZE);
-
-		if (cmp == 0 && (cookie == 0
-			|| cookie == (*it).cookie)) {
-			structs::tasks.erase(it);
-			break;
-		}
-	}
-
-	mute.unlock();
+	storage::nodes.add_attempts(hash);
 }
 /*********************************************************/
 void tasks_handler::rm_cookie(size_t cookie) {
-	vector<struct udp_task>::iterator it;
-
 	mute.lock();
-	it = structs::tasks.begin();
+	auto it = structs::tasks.begin();
 
-	if (structs::tasks.size() == 0) {
+	if (structs::tasks.empty()) {
 		mute.unlock();
 		return;
 	}
 
 	for (; it != structs::tasks.end(); it++) {
-		if (cookie == (*it).cookie) {
-			cout << "Rm " << it->type << "\\" << (*it).cookie << endl;
+		if (cookie == it->cookie) {
 			structs::tasks.erase(it);
 			break;
 		}
@@ -66,7 +42,11 @@ void tasks_handler::rm_cookie(size_t cookie) {
 
 	mute.unlock();
 }
-/*********************************************************/
+/**********************************************************/
+#define TO_REMOVE(t) \
+	(  (t) == USER_REQ_PING || (t) == NODE_REQ_PING  \
+	|| (t) == REQ_ROLE      || (t) == NODE_RES_PING  )
+
 void tasks_handler::renew(void) {
 	using structs::father;
 	using structs::tasks;
@@ -77,21 +57,15 @@ void tasks_handler::renew(void) {
 	size = tasks.size();
 
 	for (size_t i = 0; i < size; i++) {
-		if (tasks[i].type == USER_REQ_PING
-			|| tasks[i].type == NODE_REQ_PING
-			|| tasks[i].type == REQ_ROLE) {
+		if (TO_REMOVE(tasks[i].type)) {
 			tasks.erase(tasks.begin() + i);
 			continue;
 		}
 
 		if (structs::role == UDP_USER) {
-			if (tasks[i].type != USER_REQ_TUNNEL
-				&& tasks[i].type != USER_REQ_NODE) {
-				tasks.erase(tasks.begin() + i);
-				continue;
-			}
-
-			tasks[i].sddr = sddr_get(father.info.ipp);
+			tasks.erase(tasks.begin() + i);
+			continue;
+			//tasks[i].sddr = sddr_get(father.info.ipp);
 		}
 		
 
@@ -144,7 +118,6 @@ bool tasks_handler::first(struct udp_task &one) {
 
 		if (tasks[i].attempts >= 3
 			|| one.time < tasks[i].time) {
-			// Если много сообщений для отца - смена
 			continue;
 		}
 
@@ -185,14 +158,14 @@ void tasks_handler::check(void) {
 			tasks.erase(tasks.begin() + i);
 		}
 	}
-
+/*	???????????????????????????????????????
 	for (auto &p : tasks) {
 		if (ipport_get(p.sddr).ip == ip
 			&& p.attempts >= 3) {
 			num++;
 		}
 	}
-
+*/ 
 	mute.unlock();
 
 	if (num > 15) {

@@ -10,7 +10,7 @@ $statuslist = array(
 	2 => "found"
 );
 
-$req = "\x00" . sodium_hex2bin(CLIENT);
+$req = "\x02" . sodium_hex2bin(CLIENT);
 $API_address = "localhost";
 $API_port = 2122;
 
@@ -26,11 +26,10 @@ while (true) {
 		break;
 	}
 
-	$str = sodium_bin2hex($buff);
-	$status = (int)$str[HASHSIZE * 2 + 1];
+	$str = sodium_bin2hex($buff)."\n";
 
-	if (isset($statuslist[$status])) {
-		echo "Status: {$statuslist[$status]}.\n";
+	if (isset($statuslist[$str[1]])) {
+		echo "Status: {$statuslist[$str[1]]}.\n";
 		break;
 	}
 

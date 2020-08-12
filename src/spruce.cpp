@@ -11,8 +11,9 @@ void user_api(size_t port) {
 	int usock, rs = -1;
 	size_t len;
 
+	assert(port != 0);
+
 	usock = new_socket(SOCK_STREAM, TIMEOUT);
-	assert(usock != 0 && port != 0);
 	set_sockaddr(srv.sddr, port);
 
 	if (bind(usock, srv.ptr, sz) != 0
@@ -23,7 +24,7 @@ void user_api(size_t port) {
 		return;
 	}
 
-	while (network.work) {
+	while (network.work && structs::role != UDP_NODE) {
 		if (rs < 0 && (rs = accept(usock, cln.ptr, &sz)) < 0) {
 			continue;
 		}
@@ -31,7 +32,7 @@ void user_api(size_t port) {
 		memset(buff, 0x00, PACKLEN);
 
 		len = recv(rs, buff, PACKLEN, 0);
-		ret = userapi::processing(buff, len);
+		ret = spruceapi::processing(buff, len);
 
 		if (len > 0) {
 			if (send(rs, ret, len, 0) == -1) {
@@ -54,15 +55,17 @@ int main(void) {
 	string pub = db.get_var("PUBLIC_KEY");
 	string sec = db.get_var("SECRET_KEY");
 	string api = db.get_var("API_PORT");
-	const short hs = HASHSIZE * 2;
+	constexpr short hs = HASHSIZE * 2;
+
+	encryption::new_pair(&structs::fkeys);
 
 	if (pub.length() == hs && sec.length() == hs) {
 		keys.pub = hex2bin(hs, pub);
 		keys.sec = hex2bin(hs, sec);
 	}
 	else {
-		encryption::new_keys();
-
+		encryption::new_pair(&structs::keys);
+		
 		pub = bin2hex(HASHSIZE, keys.pub);
 		sec = bin2hex(HASHSIZE, keys.sec);
 
@@ -72,18 +75,6 @@ int main(void) {
 
 	role = (db.get_var("UDP_USER") == "1") ? UDP_USER
 										   : UDP_NONE;
-
-	////////////////for removing!!!!!!!!!!!!!!!!!!!!!!!
-	if (pub == "46e68bc9018936b1a2b466283341f9d48139420a78e683641e458459967e7b44") {
-		role = UDP_NODE;
-	}
-	////////////////for removing!!!!!!!!!!!!!!!!!!!!!!!
-
-	father.status = db.get_father(father.info.hash,
-								  father.info.ipp.ip);
-	father.info.ipp.port = UDP_PORT;
-	father.info.ping = system_clock::now();
-
 	storage::nodes.select();
 	network.start();
 
@@ -98,53 +89,11 @@ int main(void) {
 
 	thread check = thread(check_storage);
 
-	user_api((api != "") ? stoi(api) : API_PORT);
-	check.join();
+	if (role == UDP_USER) {
+		user_api((api != "") ? stoi(api) : API_PORT);
+	}
+
+	if (check.joinable()) check.join();
 
 	return 0;
 }
-/*
-int main(void) {
-	
-
-	using structs::father;
-	using structs::keys;
-	using storage::db;
-
-	string pub = db.get_var("PUBLIC_KEY");
-	string sec = db.get_var("SECRET_KEY");
-	const short hs = HASHSIZE * 2;
-
-	cout << "nn: " << pub << endl;
-
-	if (pub.length() == hs && sec.length() == hs) {
-		keys.pub = hex2bin(hs, pub);
-		keys.sec = hex2bin(hs, sec);
-
-		cout << "pub: " << pub << endl;
-	}
-	else {
-		encryption::new_keys();
-
-		pub = bin2hex(HASHSIZE, keys.pub);
-		sec = bin2hex(HASHSIZE, keys.sec);
-
-		db.set_var("PUBLIC_KEY", pub);
-		db.set_var("SECRET_KEY", sec);
-
-		cout << "aa!!\n";
-	}
-
-
-	struct udp_task task;
-	pack in, out;
-
-	in.tmp(REQ_ROLE);
-	task = in.to_task(structs::keys.pub);
-
-	out = pack(task.buff, task.len);
-
-	if (!out.is_correct()) {
-		cout << "Not correct.\n";
-	}
-}*/

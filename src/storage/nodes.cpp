@@ -1,184 +1,216 @@
 
 #include "../../include/storage.hpp"
+
 /*********************************************************/
 void nodes_handler::select(void) {
-	map<unsigned char *, string> list = storage::db.nodes();
-	struct client one;
+	using structs::nodes;
 
-	mute.lock();
+	auto list = storage::db.nodes();
+	struct client_att one;
+
+	if (list.empty()) {
+		cout << "[E]: Node list is empty.\n";
+		exit(1);
+	}
 
 	for (auto &p : list) {
 		assert(p.first);
 
+		one.id = byte_sum(p.first, HASHSIZE);
+		one.ipp = { UDP_PORT, p.second };
+		one.ping = system_clock::now();
 		HASHCPY(one.hash, p.first);
-		one.ipp.ip = p.second;
-		one.ipp.port = UDP_PORT;
+
 		delete[] p.first;
-
-		structs::nodes.push_back(one);
-	}
-
-	mute.unlock();
-
-	if (list.size() == 0) {
-		cout << "[E]: Node list is empty.\n";
-		exit(1);
+		vector_push(nodes, one);
 	}
 }
 /*********************************************************/
-void nodes_handler::temporary_father(void) {
-	using storage::father;
-	using structs::keys;
-
-	string ip = structs::father.info.ipp.ip;
-	struct client dad;
-
+size_t nodes_handler::size(void) {
 	mute.lock();
-
-	if (structs::nodes.size() == 0) {
-		cout << "[E]: Node list is empty.\n";
-		exit(1);
-	}
-
-	dad = structs::nodes[0];
-
-	for (auto &p : structs::nodes) {
-		if (father.cmp(keys.pub, dad.hash, p.hash) == 1
-			|| ip == p.ipp.ip) {
-			continue;
-		}
-
-		dad = p;
-	}
-
+	size_t size = structs::nodes.size();
 	mute.unlock();
-	storage::father.set(dad);
+
+	return size;
 }
 /*********************************************************/
 void nodes_handler::rm_hash(unsigned char *hash) {
-	vector<struct client>::iterator it;
+	vector<struct client_att>::iterator it;
 	string ip;
 
 	assert(hash);
 
 	mute.lock();
 
-	if (structs::nodes.size() < 5) {
+	if (!vector_search(it, structs::nodes, hash)) {
 		mute.unlock();
 		return;
 	}
 
-	it = structs::nodes.begin();
-
-	for (; it != structs::nodes.end(); it++) {
-		if (memcmp((*it).hash, hash, HASHSIZE) != 0) {
-			continue;
-		}
-
-		ip = (*it).ipp.ip;
-		structs::nodes.erase(it);
-		break;
-	}
+	ip = it->ipp.ip;
+	structs::nodes.erase(it);
 
 	mute.unlock();
 	storage::db.rm_node(ip);
 }
 /*********************************************************/
 void nodes_handler::add(unsigned char *hash, string ip) {
-	struct client one;
+	using structs::nodes;
+
+	vector<struct client_att>::iterator it;
+	struct client_att one;
 
 	assert(hash && ip.length() > 5);
 	mute.lock();
 
-	if (structs::nodes.size() >= NODE_LIMIT
-		&& IS_ME(hash)) {
+	if (IS_ME(hash)) {
 		mute.unlock();
 		return;
 	}
 
-	for (auto p : structs::nodes) {
-		if (memcmp(hash, p.hash, HASHSIZE) == 0) {
-			mute.unlock();
-			return;
-		}
+	if (vector_search(it, nodes, hash)) {
+		it->ping = system_clock::now();
+		it->attempts = 0;
+		mute.unlock();
+		return;
 	}
 
-	one.ipp = { UDP_PORT, ip };
-	HASHCPY(one.hash, hash);
+	if (nodes.size() >= NODE_LIMIT) {
+		storage::db.rm_node(nodes.begin()->ipp.ip);
+		nodes.erase(nodes.begin());
+	}
 
-	structs::nodes.push_back(one);
+	one.id = byte_sum(hash, HASHSIZE);
+	one.ipp = {UDP_PORT, ip};
+	HASHCPY(one.hash, hash);
+	vector_push(nodes, one);
+
 	mute.unlock();
 
 	storage::db.rm_node(ip);
-	storage::db.add_node(one.hash, ip);
+	storage::db.add_node(hash, ip);
 }
 /*********************************************************/
 void nodes_handler::check(void) {
-	using structs::father;
 	using structs::nodes;
-	using structs::role;
-
-	auto time = system_clock::now() - ping;
-	pack msg;
-
+return;
 	mute.lock();
 
-	if (nodes.size() >= NODE_MIN || time < 100s
-		|| role == UDP_NONE) {
-		mute.unlock();
-		return;
+	if (structs::nodes.empty()) {
+		cout << "[E]: Node list is empty. Please update"
+			 << " the database(1).\n";
+		exit(1);
 	}
 
-	ping = system_clock::now();
+	auto r = remove_if(nodes.begin(), nodes.end(),
+					   [](struct client_att one){
+		auto time = system_clock::now();
+		return one.attempts >= 3 && time - one.ping > 10s;
+	});
 
-	if (nodes.size() >= NODE_MIN) {
-		mute.unlock();
-		return;
+	nodes.erase(r, nodes.end());
+	mute.unlock();
+}
+/*********************************************************/
+struct client nodes_handler::nearest(unsigned char *hash) {
+	using storage::father;
+
+	struct client_att node = structs::nodes[0];
+
+	assert(hash);
+	mute.lock();
+
+	if (structs::nodes.empty()) {
+		cout << "[E]: Node list is empty. Please update"
+			 << " the database(2).\n";
+		exit(1);
 	}
 
-	if (role == UDP_NODE) {
-		mute.unlock();
-		this->from_clients();
+	for (auto &p : structs::nodes) {
+		if (IS_ME(p.hash)) {
+			continue;
+		}
 
-		if (nodes.size() > 5) {
-			return;
+		if (father.cmp(hash, p.hash, node.hash) == 1) {
+			node = p;
 		}
 	}
 
 	mute.unlock();
 
-	msg.tmp((role == UDP_USER) ? USER_REQ_NODE
-							   : NODE_REQ_NODE);
-
-	storage::tasks.add(msg, sddr_get(father.info.ipp),
-	                   father.info.hash);
+	return static_cast<struct client>(node);
 }
 /*********************************************************/
-void nodes_handler::from_clients(void) {
-	storage::clients.mute.lock();
+void nodes_handler::add_attempts(unsigned char *hash) {
+	vector<struct client_att>::iterator it;
+	auto time = system_clock::now();
 
-	for (auto p : structs::clients) {
-		if (structs::nodes.size() >= NODE_MIN) {
-			break;
-		}
+	assert(hash);
 
-		if (p.is_node) {
-			this->add(p.hash, p.ipp.ip);
-		}
+	mute.lock();
+
+	if (vector_search(it, structs::nodes, hash)
+		&& time - it->ping > 9s) {
+		it->attempts++;
+		it->ping = time;
 	}
 
-	storage::clients.mute.unlock();
+	mute.unlock();
+}
+/*********************************************************/
+void nodes_handler::sub_attempts(unsigned char *hash) {
+	vector<struct client_att>::iterator it;
+
+	assert(hash);
+
+	mute.lock();
+
+	if (vector_search(it, structs::nodes, hash)) {
+		it->ping = system_clock::now();
+		it->attempts = 0;
+	}
+
+	mute.unlock();
+}
+/*********************************************************/
+struct client nodes_handler::get_notdad(unsigned char *hash) {
+	vector<struct client_att>::iterator it;
+	struct client ret;
+
+	mute.lock();
+
+	if (structs::nodes.size() < 3) {
+		cout << "Can't get node which is note current"
+			 << " father, please update the database.\n";
+		exit(1);
+	}
+
+	it = structs::nodes.begin();
+
+	if (it->ipp == structs::father.info.ipp) {
+		it++;
+	}
+
+	if (hash && HASHEQ(it->hash, hash)) {
+		it++;
+	}
+
+	ret = static_cast<struct client>(*it);
+	mute.unlock();
+
+	return ret;
 }
 /*********************************************************/
 #if defined(DEBUG) && DEBUG == true
 
 void nodes_handler::print(void) {
-	cout << "Hash, Ip:Port" << endl
+	cout << "Id, Hash, Ip:Port" << endl
 		 << "----------------------" << endl;
 	mute.lock();
 
-	for (auto &p : structs::nodes) {
-		cout << bin2hex(HASHSIZE, p.hash) << ", " 
+	for (client_att &p : structs::nodes) {
+		cout << p.id << ", "
+			 << bin2hex(HASHSIZE, p.hash) << ", " 
 			 << p.ipp.ip << ":" << p.ipp.port
 			 << endl;
 	}

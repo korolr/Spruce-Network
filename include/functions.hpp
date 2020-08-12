@@ -1,5 +1,21 @@
 
-#include "../include/spruce.hpp"
+#ifndef _SPRUCE_FUNCTIONS_
+#define _SPRUCE_FUNCTIONS_
+
+#include "spruce.hpp"
+
+size_t byte_sum(unsigned char *b, size_t size) {
+	size_t sum = 0;
+
+	assert(b && size > 0);
+
+	for (size_t i = 0; i < size; i++) {
+		sum += b[i];
+	}
+
+	return sum;
+}
+
 /**
 *	Function to convert sockaddr_in structure to ipport structure
 */
@@ -31,7 +47,7 @@ struct sockaddr_in sddr_get(struct ipport ipp) {
 /*
 *	Random number generation.
 */
-///////////////////////////////////////aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+///////////////////////////////////////
 size_t random_cookie(void) {
 	/*mt19937 gen; 
 	gen.seed(time(0));
@@ -134,8 +150,9 @@ int new_socket(int type, size_t time) {
 	struct timeval timeout;
 	char *t_opt;
 
-	new_sock = socket(AF_INET, type, 0);
-	assert(new_sock != -1);
+	if ((new_sock = socket(AF_INET, type, 0)) == 0) {
+		return 0;
+	}
 
 	t_opt = reinterpret_cast<char *>(&timeout);
 	timeout.tv_sec = time;
@@ -148,22 +165,12 @@ int new_socket(int type, size_t time) {
 	return new_sock;
 }
 
-void set_sockaddr(struct sockaddr_in &sddr, size_t port,
-				  string ip) {
+void set_sockaddr(struct sockaddr_in &sddr, size_t port = 0,
+				  string ip = "") {
 	sddr.sin_addr.s_addr = (ip.length() > 0) ? inet_addr(ip.c_str())
 											 : INADDR_ANY;
 	sddr.sin_port = htons(port);
 	sddr.sin_family = AF_INET;
 }
 
-size_t byte_sum(unsigned char *b, size_t size) {
-	size_t sum = 0;
-
-	assert(b && size > 0);
-
-	for (size_t i = 0; i < size; i++) {
-		sum += b[i];
-	}
-
-	return sum;
-}
+#endif

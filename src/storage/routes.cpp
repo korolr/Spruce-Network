@@ -1,219 +1,123 @@
+
 #include "../../include/storage.hpp"
-/*********************************************************/
-void routes_handler::set(bool full, unsigned char *hash,
-						 unsigned char *father,
-						 struct ipport ipp) {
-	bool exists = false;
+
+void routes_handler::add(unsigned char *hash, size_t code,
+						 enum route_state state) {
+	vector<struct route>::iterator it;
+	auto time = system_clock::now();
+	bool status = false;
 	struct route one;
 
 	assert(hash);
-	mute.lock();
 
-	for (auto &p : structs::routes) {
-		if (memcmp(p.hash, hash, HASHSIZE) != 0) {
-			continue;
-		}
-
-		exists = true;
-
-		if (full) {
-			if (p.full) {
-				break;
-			}
-
-			p.time = system_clock::now();
-			HASHCPY(one.father, father);
-			p.full = true;
-			p.ipp = ipp;
-			break;
-		}
-	}
-
-	if (exists) {
-		mute.unlock();
-		return;
-	}
-
-	one.time = system_clock::now();
+	one.id = byte_sum(hash, HASHSIZE);
 	HASHCPY(one.hash, hash);
-	one.full = full;
-	one.ipp = ipp;
-
-	if (full) {
-		assert(father);
-		HASHCPY(one.father, father);
-	}
-
-	structs::routes.push_back(one);
-	mute.unlock();
-}
-/*********************************************************/
-void routes_handler::update(unsigned char *hash,
-							unsigned char *father,
-							struct ipport ipp) {
-	vector<struct route>::iterator it;
-	bool found = false;
-
-	assert(hash && father);
+	one.status = state;
+	one.time = time;
+	one.code = code;
 
 	mute.lock();
-	it = structs::routes.begin();
 
-	for (; it != structs::routes.end(); it++) {
-		if (memcmp((*it).hash, hash, HASHSIZE) != 0) {
-			continue;
-		}
+	status = vector_search(it, structs::routes, hash);
 
-		if ((*it).full) {
-			break;
-		}
-
-		found = true;
-		break;
-	}
-
-	if (!found) {
+	if (status && time - it->time <= 60s) {
+		it->status = state;
 		mute.unlock();
 		return;
 	}
 
-	(*it).time = system_clock::now();
-	HASHCPY((*it).father, father);
-	(*it).full = true;
-	(*it).ipp = ipp;
-
-	mute.unlock();
-}
-/*********************************************************/
-/*bool routes_handler::find(unsigned char *hash,
-						  struct route &one) {
-	bool found = false;
-
-	assert(hash);
-	mute.lock();
-
-	for (auto &p : structs::routes) {
-		if (memcmp(p.hash, hash, HASHSIZE) != 0) {
-			continue;
-		}
-
-		p.time = system_clock::now();
-		found = true;
-		one = p;
-		break;
-	}
-
-	mute.unlock();
-	return found;
-}*/
-bool routes_handler::exists(unsigned char *hash) {
-	bool found = false;
-
-	mute.lock();
-
-	for (auto &p : structs::routes) {
-		if (memcmp(p.hash, hash, HASHSIZE) == 0
-			&& p.full) {
-			found = true;
-			break;
-		}
-	}
-
-	mute.unlock();
-	return found;
-}
-/*********************************************************/
-bool routes_handler::find(unsigned char *hash,
-						  vector<struct route>::iterator &it) {
-	vector<struct route>::iterator i;
-	bool found = false;
-
-	assert(hash);
-
-	i = structs::routes.begin();
-	mute.lock();
-
-	for (; i != structs::routes.end(); i++) {
-		if (memcmp((*i).hash, hash, HASHSIZE) != 0
-			|| !(*i).full) {
-			continue;
-		}
-
-		found = true;
-		it = i;
-		break;
-	}
-
-	mute.unlock();
-	return found;
-}
-/*********************************************************/
-void routes_handler::rm_hash(unsigned char *hash) {
-	vector<struct route>::iterator it;
-	int cmp;
-
-	assert(hash);
-	mute.lock();
-
-	it = structs::routes.begin();
-
-	for (; it != structs::routes.end(); it++) {
-		cmp = memcmp((*it).hash, hash, HASHSIZE);
-
-		if (cmp != 0 || !(*it).full) {
-			continue;
-		}
-
+	if (status) {
 		structs::routes.erase(it);
-		break;
+	}
+
+	vector_push(structs::routes, one);
+	mute.unlock();
+}
+
+bool routes_handler::upd(unsigned char *hash,
+						 size_t code,
+						 struct haship node) {
+	vector<struct route>::iterator it;
+
+	assert(!IS_NULL(node.hash, HASHSIZE) && hash
+			&& node.ip.length() > 0);
+
+	mute.lock();
+
+	if (!vector_search(it, structs::routes, hash)) {
+		mute.unlock();
+		return false;
+	}
+
+	it->time = system_clock::now();
+
+	if (it->code != code) {
+		it->status = NFOUND;
+		mute.unlock();
+		return true;
+	}
+
+	it->ipp = { UDP_PORT, node.ip};
+	HASHCPY(it->node, node.hash);
+	it->status = FOUND;
+
+	mute.unlock();
+	return true;
+}
+
+bool routes_handler::find(unsigned char *hash,
+						  struct route &one) {
+	vector<struct route>::iterator it;
+
+	assert(hash);
+	mute.lock();
+
+	if (!vector_search(it, structs::routes, hash)) {
+		mute.unlock();
+		return false;
+	}
+
+	one = *it;
+	mute.unlock();
+
+	return true;
+}
+
+void routes_handler::ping(unsigned char *hash) {
+	vector<struct route>::iterator it;
+
+	assert(hash);
+	mute.lock();
+
+	if (vector_search(it, structs::routes, hash)) {
+		it->time = system_clock::now();
 	}
 
 	mute.unlock();
 }
-/*********************************************************/
+
 void routes_handler::check(void) {
 	using structs::routes;
 
-	auto ctime = system_clock::now();
-	size_t size;
-
 	mute.lock();
 
-	if ((size = routes.size()) == 0) {
-		mute.unlock();
-		return;
-	}
+	auto rmc = remove_if(routes.begin(), routes.end(),
+						 [&](struct route &element) {
+		auto time = system_clock::now();
 
-	for (size_t i = 0; i < size; i++) {
-		if (ctime - routes[i].time <= 1800s) {
-			continue;
+		if (time - element.time <= 60s) {
+			return false;
 		}
 
-		routes.erase(routes.begin() + i);
-	}
+		if (element.status == PROGRESS) {
+			element.status = NFOUND;
+			element.time = time;
+			return false;
+		}
 
+		return time - element.time > 100s;
+	});
+
+	routes.erase(rmc, routes.end());
 	mute.unlock();
 }
-/*********************************************************/
-#if defined(DEBUG) && DEBUG == true
-
-void routes_handler::print(void) {
-	struct ipport ipp;
-
-	cout << "father(hash:ip), Client hash, Is full" << endl
-		 << "-------------------------------------" << endl;
-
-	mute.lock();
-
-	for (auto &p : structs::routes) {
-		cout << bin2hex(HASHSIZE, p.father) << ":"
-			 << p.ipp.ip << ", "
-			 << bin2hex(HASHSIZE, p.hash) << ", "
-			 << ((p.full) ? "True" : "False") << endl;
-	}
-
-	mute.unlock();
-	cout << endl << endl;
-}
-
-#endif

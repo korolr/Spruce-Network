@@ -1,325 +1,152 @@
-#include "../include/spruce.hpp" //// just add spruce?????????
-#include "../include/storage.hpp"
 
-void tcp_tunnel::init(struct init_tunnel initd,
-					  struct tunnel *ptr) {
-	if (!initd.hash || !ptr) {
-		work = false;
-		return;
+#include "../include/tcptunnel.hpp"
+/*********************************************************/
+void tcp_tunnel::start(bool is_send, size_t port) {
+	auto &tunn = (is_send) ? send_init : recv_init;
+	tunn.sock = new_socket(SOCK_STREAM, TIMEOUT);
+	string ipaddr;
+	bool conn;
+
+	assert(port != 0 && tunn.sock != -1 && !tunn.start);
+
+	role = (role == TCP_NONE) ? *init.role : role;
+	tunn.start = true;
+	work = true;
+
+	conn = (role == TCP_BINDER2 && !is_send) || role % 2 != 0;
+
+	if (role % 2 != 0) {
+		HASHCPY(tunn.hash, init.node->hash);
+		ipaddr = init.node->ipp.ip;
+	}
+	else {
+		HASHCPY(tunn.hash, (role > TCP_BINDER1) ? init.user->hash
+												: init.node->hash);
+		ipaddr = (is_send) ? init.node->ipp.ip  : string();
 	}
 
-	HASHCPY(ehash, initd.hash);
-	it = ptr;
+	set_sockaddr(tunn.own.sddr, port, ipaddr);
+	bool chain = connect_chain(tunn, conn);
 
-	switch (initd.type) {
-	case TCP_SND:
-		this->sender(initd.role, initd.ipp);
-		return;
-
-	case TCP_RCV:
-		this->receiver(initd.role, initd.ipp.port);
-		return;
-
-	default: work = false;
+	auto func = (is_send) ? &tcp_tunnel::send_thread
+						  : &tcp_tunnel::recv_thread;
+	if (work && chain) {
+		tunn.thr = thread(func, this, conn);
 	}
 }
-
-tcp_tunnel::~tcp_tunnel(void) {
-	if (thr.joinable()) { thr.join(); }
-	CLOSE_SOCKET(sock);
-	work = false;
-}
-
-
-void tcp_tunnel::sender(enum tcp_role r, struct ipport ipp) {
+/*********************************************************/
+bool tcp_tunnel::connect_chain(tcp_tunnel::tcp_data &tunn,
+							   bool connector) {
 	socklen_t sz = sizeof(struct sockaddr_in);
 	auto time = system_clock::now();
+	bool cond = false;
 
-	sock = new_socket(SOCK_STREAM,  TIMEOUT);
-	set_sockaddr(srv.sddr, ipp.port, ipp.ip);
-	assert(ipp.port != 0 && sock != 0);
+	if (!connector) {
+		int b = bind(tunn.sock, tunn.own.ptr, sz);
+		int l = listen(tunn.sock, 5);
 
-	it->time = system_clock::now();
-	s_port = ipp.port;
-	role = r;
+		work = (b + l != 0) ? false : true;
+	}
 
-	while (connect(sock, srv.ptr, sz) < 0) {
-		if (system_clock::now() - time < 30s) {
+	while (!cond) {
+		if (system_clock::now() - time > 15s) {
+			work = false;
+			break;
+		}
+
+		if (!connector) {
+			tunn.usock = accept(tunn.sock, tunn.srv.ptr,
+								&sz);
+			cond = tunn.usock < 0;
 			continue;
 		}
 
-		it->mute.lock();
-		it->status = ERROR_T;
-		it->mute.unlock();
-		work = false;
-		return;
+		cond = connect(tunn.sock, tunn.own.ptr, sz) < 0;
 	}
 
-	thr = thread(&tcp_tunnel::thr_send, this);
+	return cond;
 }
-
-
-
-
-
-
-
-
-
-
-
-void tcp_tunnel::receiver(enum tcp_role r, size_t port) {
-	socklen_t sz = sizeof(struct sockaddr_in);
+/*********************************************************/
+void tcp_tunnel::send_thread(bool connector) {
 	auto time = system_clock::now();
-	int csock = 0;
+	unsigned char flag, *encoded, *key;
+	int fn_status, size, sock;
 
-	sock = new_socket(SOCK_STREAM, TIMEOUT);
-	assert(port != 0 && sock != 0);
+	key = (role % 2 != 0) ? init.node->hash
+						  : init.user->hash;
 
-	set_sockaddr(srv.sddr, port);
+	sock = (connector)	  ? send_init.sock
+						  : send_init.usock;
 
-	it->mute.lock();
-	it->status = TUNNEL_1;
-	it->time = system_clock::now();
-	it->mute.unlock();
+// 0x00 - wait, 0x01 - ready
+	while (time - send_init.time > 8s && work) {
+		if (recv(sock, &flag, 1, 0) <= 0) {
+			work = false;
+			break;
+		}
 
-	r_port = port;
-	role = r;
-
-	if (bind(sock, srv.ptr, sz) != 0) {
-		cout << "[E]: Port is bussy.\n";
-		work = false;
-		return;
-	}
-
-	if (listen(sock, 5) != 0) {
-		cout << "[E]: Can't start listening the socket.\n";
-		work = false;
-		return;
-	}
-
-	while ((csock = accept(sock, cln.ptr, &sz)) < 0) {
-		if (system_clock::now() - time < 30s) {
+		if (flag == 0 || buff_size() == 0) {
 			continue;
 		}
 
-		it->mute.lock();
-		it->status = ERROR_T;
-		it->mute.unlock();
-		work = false;
-		return;
+		mute.lock();
+
+		encoded = encryption::pack(key, buffer, length);
+		size = length + crypto_box_SEALBYTES;
+		time = system_clock::now();
+		length = 0;
+
+		fn_status = send(sock, encoded, size, 0);
+		mute.unlock();
+
+		delete[] encoded;
+
+		work = (fn_status == -1) ? false : true;
 	}
-
-	it->mute.lock();
-
-	switch (r) {
-	case TCP_TARGET:
-		work = false;
-		it->mute.unlock();
-		return;
-
-	case TCP_BINDER1:
-		it->status = TUNNEL_1;
-		break;
-
-	case TCP_BINDER2:
-	case TCP_UBINDER:
-		it->status = TUNNEL_2;
-		break;
-
-	default:
-		it->status = ERROR_T;
-		it->mute.unlock();
-		work = false;
-		return;
-	}
-
-	it->mute.unlock();
-
-	thr = thread([&](int s) {
-			unsigned char b[PACKLEN];
-			size_t l;
-
-			while (work) {
-				l = recv(s, b, PACKLEN, 0);
-				this->recv_processing(b, s, l);
-			}
-			CLOSE_SOCKET(s);
-		}, 
-		csock);
 }
+/*********************************************************/
+void tcp_tunnel::recv_thread(bool connector) {
+	auto time = system_clock::now();
+	unsigned char flag, *decoded;
 
+	int sock = (connector) ? recv_init.sock
+						   : recv_init.usock;
 
-void tcp_tunnel::thr_send(void) {
-	enum tcp_status st = CUR_STATUS, r_st = ERROR_T;
-	bool bin2;
-	size_t len;
+	while (time - recv_init.time > 8s && work) {
+		flag = (buff_size() == 0) ? 1 : 0;
 
-	bin2 = role == TCP_BINDER2 || role == TCP_UBINDER;
-	// Мы меняем текущий статус так как конечный
-	// пользователь был подключен.
-	if (bin2) {
-		it->mute.lock();
-		it->status = TUNNEL_3;
-		it->mute.unlock();
-	}
+		if (send(sock, &flag, 1, 0) < 0) {
+			work = false;
+			break;
+		}
 
-	while (work) {
-		if (bin2) {
-			this->send_processing(TUNNEL_3, bin2);
+		if (flag == 0) {
 			continue;
 		}
 
-		if ((len = recv(sock, &r_st, 1, 0)) == 0) {
-			it->mute.lock();
-			it->status = ERROR_T;
-			it->mute.unlock();
+		time = system_clock::now();
+		mute.lock();
+
+		length = recv(sock, buffer, TUNNPACK, 0);
+
+		if (length <= 0) {
 			work = false;
-			return;
+			mute.unlock();
+			break;
 		}
 
-		if (len == 1 && it->status >= TUNNEL_3
-			&& r_st < TUNNEL_3) {
-			it->mute.lock();
-			it->status = ERROR_T;
-			it->mute.unlock();
+		length -= crypto_box_SEALBYTES;
+		decoded = encryption::unpack(buffer, length);
+
+		if (!decoded) {
 			work = false;
-			return;
+			mute.unlock();
+			break;
 		}
 
-		if (send(sock, &st, 1, 0) == -1
-			|| !NORMAL_STATUS(r_st))  {
-			it->mute.lock();
-			it->status = ERROR_T;
-			it->mute.unlock();
-			work = false;
-			return;
-		}
+		memcpy(buffer, decoded, length);
+		delete[] decoded;
 
-		this->send_processing(r_st, bin2);
-	}
-}
-
-
-
-
-
-
-
-
-
-
-void tcp_tunnel::recv_processing(unsigned char *buff,
-								 int csock,
-								 size_t len) {
-	unsigned char st;
-
-	if (system_clock::now() - it->time > 50s) {
-		it->mute.lock();
-		it->status = ERROR_S;
-		it->mute.unlock();
-		work = false;
-		return;
-	}
-
-	if (len == 0) {
-		it->mute.lock();
-		it->status = ERROR_T;
-		it->mute.unlock();
-		work = false;
-		return;
-	}
-
-	if (len == 1 && *buff == CUR_STATUS) {
-		// Если в буффере есть записи - отдаем статус wait для
-		// нижестоящего клиента т.к. нужно переслать имеющийся
-		// буффер.
-		it->mute.lock();
-		st = (it->length == 0) ? it->status
-							   : WAIT_SEND;
-		if (send(sock, &st, 1, 0) == -1) {
-			it->status = ERROR_T;
-			work = false;
-		}
-
-		it->mute.unlock();
-		return;
-	}
-
-	if ((len > 1 && it->status != TUNNEL_3)
-		|| (len > 1 && it->length != 0)) {
-		it->mute.lock();
-		it->status = ERROR_T;
-		it->mute.unlock();
-		work = false;
-		return;
-	}
-
-	it->mute.lock();
-	memcpy(it->content, buff, len);
-	it->time = system_clock::now();
-	it->length = len;
-	it->mute.unlock();
-}
-
-
-
-
-
-
-
-
-void tcp_tunnel::send_processing(enum tcp_status status,
-								 bool is_bin2) {
-	if (it->status != status && !is_bin2) {
-		it->mute.lock();
-		it->time = system_clock::now();
-		it->status = status;
-		it->mute.unlock();
-	}
-
-	if (system_clock::now() - it->time > 50s
-		|| status == CUR_STATUS) {
-		it->mute.lock();
-		it->status = ERROR_T;
-		it->mute.unlock();
-		work = false;
-		return;
-	}
-
-	switch (it->status) {
-	case ERROR_S:
-	case ERROR_T:
-		work = false;
-		break;
-
-	case TUNNEL_1:
-	case TUNNEL_2:
-	case WAIT_SEND:
-		break;
-
-	case TUNNEL_3:
-		if (it->length == 0) {
-			return;
-		}
-
-		if (send(sock, it->content, it->length, 0) == -1) {
-			it->mute.lock();
-			it->status = ERROR_T;
-			it->mute.unlock();
-			work = false;
-			return;
-		}
-
-		it->mute.lock();
-		it->length = 0;
-		it->mute.unlock();
-		break;
-
-	default:
-		it->mute.lock();
-		it->status = ERROR_T;
-		it->mute.unlock();
-		work = false;
+		mute.unlock();
 	}
 }

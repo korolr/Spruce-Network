@@ -3,14 +3,60 @@
 #define _SPRUCE_STORAGE_
 
 #include "spruce.hpp"
+#include "pack.hpp"
+
+template<typename T, typename S> void
+vector_push(T &vec, S &data) {
+	auto comp = [](S prev, S next) {
+		return prev.id < next.id;
+	};
+
+	auto it = lower_bound(vec.begin(), vec.end(),
+						  data, comp);
+	vec.insert(it, data);
+}
+
+template<typename T> bool
+vector_search(typename vector<T>::iterator &iter,
+			  vector<T> &vec, unsigned char *h, bool debug = false) {
+
+	auto comp = [&](T prev, size_t next) {
+		return prev.id < next;
+	};
+
+	typename vector<T>::iterator it = vec.begin();
+	size_t sum;
+
+	assert(h);
+
+	if (vec.empty()) {
+		return false;
+	}
+
+	sum = byte_sum(h, HASHSIZE);
+
+	for (;; it++) {
+		it = lower_bound(it, vec.end(), sum, comp);
+
+		if (it == vec.end() || it->id != sum) {
+			return false;
+		}
+
+		if (it->id == sum && HASHEQ(it->hash, h)) {
+			break;
+		}
+	}
+
+	iter = it;
+	return true;
+}
 
 class tasks_handler {
 	private:
 		mutex mute;
 
 	public:
-		void add(pack, struct sockaddr_in, unsigned char *);
-		void rm_hash(unsigned char *, size_t);
+		void add(pack, struct sockaddr_in, unsigned char *h = nullptr);
 		bool first(struct udp_task &);
 		bool exists(enum udp_type);
 		void rm_cookie(size_t);
@@ -30,10 +76,15 @@ class nodes_handler {
 
 	public:
 		nodes_handler(void) { ping = system_clock::now() - 600s; }
+		struct client get_notdad(unsigned char *h = nullptr);
+		void add_replace(unsigned char *, string);
+		struct client nearest(unsigned char *);
 		void insert(unsigned char *, string);
 		void add(unsigned char *, string);
+		void add_attempts(unsigned char *);
+		void sub_attempts(unsigned char *);
 		void rm_hash(unsigned char *);
-		void temporary_father(void);
+		size_t size(void);
 		void select(void);
 		void check(void);
 #if defined(DEBUG) && DEBUG == true
@@ -48,8 +99,8 @@ class clients_handler {
 		void reg(unsigned char *, struct ipport, enum udp_role, bool);
 		bool find(unsigned char *, struct client &);
 		struct client nearest(unsigned char *);
-		void rm_hash(unsigned char *);
-		bool exists(unsigned char *);
+		vector<struct haship> veclist(void);
+		vector<struct client> users(void);
 		void rm_ip(string);
 		void check(void);
 #if defined(DEBUG) && DEBUG == true
@@ -66,6 +117,7 @@ class father_handler {
 		size_t cmp(unsigned char *, unsigned char *, unsigned char *);
 		father_handler(void) { ping = system_clock::now() - 600s; }
 		bool from_father(struct sockaddr_in, pack);
+		struct haship haship(void);
 		void set(struct client);
 		void no_father(void);
 		void check(void);
@@ -74,19 +126,16 @@ class father_handler {
 #endif
 };
 
-class dadreqs_handler {
+class routes_handler {
 	private:
 		mutex mute;
 
 	public:
-		void add(struct sockaddr_in, unsigned char *);
-		bool find(struct dadreq &, unsigned char *);
-		void rm_hash(unsigned char *);
-		bool exists(unsigned char *);
+		void add(unsigned char *, size_t, enum route_state s = PROGRESS);
+		bool upd(unsigned char *, size_t, struct haship);
+		bool find(unsigned char *, struct route &);
+		void ping(unsigned char *);
 		void check(void);
-#if defined(DEBUG) && DEBUG == true
-		void print(void);
-#endif
 };
 
 class db_handler {
@@ -109,102 +158,56 @@ class db_handler {
 		~db_handler(void);
 };
 
-class routes_handler {
-	private:
-		mutex mute;
-
-	public:
-		void update(unsigned char *, unsigned char *, struct ipport);
-		void set(bool, unsigned char *, unsigned char *, struct ipport);
-		bool find(unsigned char *, vector<struct route>::iterator &);
-		void rm_hash(unsigned char *);
-		bool exists(unsigned char *);
-		void check(void);
-#if defined(DEBUG) && DEBUG == true
-		void print(void);
-#endif
-};
-
-class tunnels_handler {
+class ports_handler {
 	private:
 		struct sddr_structs st;
 		mutex mute;
 
-	public:
-		bool find(unsigned char *, unsigned char *, enum tcp_role, struct tunnel **);
-		bool find_ports(unsigned char *, unsigned char *, pair<size_t, size_t> &);
-		void add(unsigned char *, unsigned char *, struct init_tunnel);
-		tunnels_handler(void) { set_sockaddr(st.sddr); }
-		bool sys_freeport(size_t);
-		bool is_freeport(size_t);
-		size_t free_port(void);
-		void check(void);
-#if defined(DEBUG) && DEBUG == true
-		void print(void);
-#endif
-};
-
-class finds_handler {
-	private:
-		mutex mute;
+		bool sys_free(size_t);
+		bool is_free(size_t);
+		size_t free(void);
 
 	public:
-		void update(unsigned char *, unsigned char);
-		size_t check(unsigned char *);
-		void add(unsigned char *);
-};
-
-
-class msgs_handler {
-	private:
-		map<unsigned char *, size_t> threads;
-		mutex mute;
-
-		void user_thread(size_t, struct tunnel *);
-		size_t thread_exists(unsigned char *);
-		void remove_thread(unsigned char *);
-
-	public:
-		size_t create_thread(unsigned char *);
-		void add(unsigned char *);
+		bool find(unsigned char *, struct tcp_port &);
+		bool reg(size_t, unsigned char *);
+		size_t try_reg(unsigned char *);
+		bool exists(unsigned char *);
+		void rm_port(size_t);
 		void check(void);
 };
 
-class inbox_handler {
-	public:
+class tunnels_handler {
+	private:
 		mutex mute;
 
-		void add(unsigned char *hash, size_t port) {
-			struct hashport one;
+		void port_req(unsigned char *, struct ipport);
+		void msg_request(struct tunnel *);
+		void sync(struct tunnel *);
 
-			assert(hash && port > 0);
-
-			HASHCPY(one.hash, hash);
-			one.port = port;
-
-			mute.lock();
-			structs::api::inbox.push_back(one);
-			mute.unlock();
-		}
+	public:
+		void user_create(unsigned char *, enum tcp_role,  size_t c = 0, struct haship hi = {});
+		void node_create(struct client, enum tcp_role, size_t, struct haship);
+		bool find_code(size_t, enum tcp_role, struct tunnel **);
+		bool find_hash(unsigned char *, struct tunnel **);
+		bool exists_n(enum tcp_role,  size_t);
+		bool exists_u(unsigned char *);
+		void check(void);
 };
 
 namespace storage {
-	inline dadreqs_handler		dadreqs;
-	inline clients_handler		clients;
 	inline tunnels_handler		tunnels;
+	inline clients_handler		clients;
 	inline father_handler		father;
 	inline routes_handler		routes;
 	inline tasks_handler		tasks;
 	inline nodes_handler		nodes;
-	inline inbox_handler		inbox;
-	inline finds_handler		finds;
-	inline msgs_handler			msgs;
+	inline ports_handler		ports;
 	inline db_handler			db;
 
 	inline void check(void) {
-		dadreqs.check(); father.check(); routes.check();
-		tunnels.check(); clients.check(); nodes.check();
-		msgs.check(); tasks.check();
+		father.check(); routes.check(); ports.check();
+		clients.check(); tasks.check(); nodes.check();
+		tunnels.check();
 	}
 }
 

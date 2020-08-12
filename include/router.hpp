@@ -6,84 +6,60 @@
 
 class father_router {
 	private:
-		struct ret
-		from_user(struct sockaddr_in,
-				  pack);
-
-		struct ret
-		chain(struct sockaddr_in, pack);
-
-		struct ret
-		iamfather(unsigned char *);
+		struct udp_father dad;
+		size_t attempts = 0;
+		mutex mute;
 
 	public:
 		struct ret
-		req(struct sockaddr_in, pack);
+		request(struct sockaddr_in, pack);
 
 		void
-		res(struct sockaddr_in, pack);
-};
-
-class nodes_router {
-	public:
-		struct ret
-		req(struct sockaddr_in, pack);
-
-		void
-		res(struct sockaddr_in, pack);
-};
-
-class tunnels_router {
-	private:
-		struct ret
-		create_tunnel(enum tcp_role,
-					  struct sockaddr_in,
-					  struct route,
-					  pack);
-
-		struct ret
-		get_message(struct sockaddr_in,
-					unsigned char *,
-					unsigned char *,
-					size_t);
-
-	public:
-		struct ret
-		req(struct sockaddr_in, pack);
-
-		void
-		res(struct sockaddr_in, pack);
+		response(struct sockaddr_in, pack);
 };
 
 class find_router {
-
-	struct find_req {
-		unsigned char hash[HASHSIZE],
-					  from[HASHSIZE];
+	struct freqs  {
+		unsigned char hash[HASHSIZE];
 		time_point<system_clock> time;
+		string ip;
 	};
 
 	private:
-		vector<struct find_req> reqs;
+		vector<struct freqs> reqs;
 		mutex mute;
 
-		struct ret
-		from_client(struct sockaddr_in,
-					pack);
-
-		struct ret
-		from_chain(struct sockaddr_in,
-				   pack);
-
 		bool
-		allow_request(pack);
+		allow(struct sockaddr_in, unsigned char *);
+
+		void 
+		find_processing(struct sockaddr_in, pack);
+
+		void
+		packet_distribution(req_find);
 
 	public:
 		struct ret
-		req(struct sockaddr_in, pack);
+		request(struct sockaddr_in, pack);
+};
+
+class port_router {
+	public:
+		struct ret
+		request(struct sockaddr_in, pack);
 
 		void
-		res(struct sockaddr_in, pack);
+		response(struct sockaddr_in, pack);
+};
+
+class message_router {
+	private:
+		void
+		message_processing(req_msg &);
+
+	public:
+		struct ret
+		request(struct sockaddr_in, pack);
 };
 
 #endif

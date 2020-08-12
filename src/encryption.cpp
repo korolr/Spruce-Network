@@ -1,14 +1,14 @@
 
 #include "../include/encryption.hpp"
 /*********************************************************/
-void encryption::new_keys(void) {
-	assert(!structs::keys.pub && !structs::keys.sec);
+void encryption::new_pair(struct keypair *pair) {
+	assert(!pair->pub && !pair->sec);
 
-	structs::keys.pub = new unsigned char[HASHSIZE];
-	structs::keys.sec = new unsigned char[HASHSIZE];
+	pair->pub = new unsigned char[HASHSIZE];
+	pair->sec = new unsigned char[HASHSIZE];
 
-	assert(structs::keys.pub && structs::keys.sec);
-	crypto_box_keypair(structs::keys.pub, structs::keys.sec);
+	assert(pair->pub && pair->sec);
+	crypto_box_keypair(pair->pub, pair->sec);
 }
 /*********************************************************/
 unsigned char *encryption::pack(unsigned char *key,
@@ -17,9 +17,7 @@ unsigned char *encryption::pack(unsigned char *key,
 	unsigned char *buff;
 	size_t len;
 
-	if (!key || !text || size < 1) {
-		return nullptr;
-	}
+	assert(key && text && size > 0);
 
 	len = size + 100 + crypto_box_SEALBYTES;
 	buff = new unsigned char[len];
@@ -34,24 +32,35 @@ unsigned char *encryption::pack(unsigned char *key,
 /*********************************************************/
 unsigned char *encryption::unpack(unsigned char *text,
 	                              size_t size) {
+	using structs::fkeys;
 	using structs::keys;
 
 	unsigned char *buff = nullptr;
 	size_t len;
-	int s;
 
 	len = size + crypto_box_SEALBYTES;
 	buff = new unsigned char[len];
 
-	assert(buff && text && size > crypto_box_SEALBYTES);
-
+	assert(buff && text && len > crypto_box_SEALBYTES);
 	memset(buff, 0x00, len);
-	s = crypto_box_seal_open(buff, text, len, keys.pub,
-                             keys.sec);
 
-	if (s != 0) {
+	if (crypto_box_seal_open(buff, text, len,
+							 keys.pub,
+							 keys.sec) != 0) {
+		if (structs::role == UDP_NODE) {
+			delete[] buff;
+			return nullptr;
+		}
+	}
+	else {
+		return buff;
+	}
+
+	if (crypto_box_seal_open(buff, text, len,
+							 fkeys.pub,
+							 fkeys.sec) != 0) {
 		delete[] buff;
-		return nullptr;
+		buff = nullptr;
 	}
 
 	return buff;

@@ -27,30 +27,33 @@ size_t father_handler::cmp(unsigned char *main,
 }
 /*********************************************************/
 void father_handler::no_father(void) {
-	storage::nodes.rm_hash(structs::father.info.hash);
-
 	mute.lock();
-	structs::father.status = false;
+	storage::nodes.rm_hash(structs::father.info.hash);
 	mute.unlock();
+
+	structs::father.status = false;
 }
 /*********************************************************/
-void father_handler::set(struct client new_father) {
-	using structs::keys;
+void father_handler::set(struct client nfather) {
+	using structs::father;
 
-	if (IS_ME(new_father.hash)) {
+	unsigned char *key = structs::keys.pub;
+
+	mute.lock();
+
+	if (IS_ME(nfather.hash) || (structs::father.status &&
+		cmp(key, nfather.hash, father.info.hash) != 1)) {
+		mute.unlock();
 		return;
 	}
 
-	mute.lock();
+	nfather.ipp.port = UDP_PORT;
+	nfather.ping = system_clock::now();
 
-	new_father.ipp.port = UDP_PORT;
-	new_father.ping = system_clock::now();
-	structs::father.info = new_father;
+	structs::father.info = nfather;
 	structs::father.status = true;
 
 	mute.unlock();
-
-	storage::db.set_father(structs::father);
 }
 /*********************************************************/
 bool father_handler::from_father(struct sockaddr_in sddr,
@@ -58,18 +61,17 @@ bool father_handler::from_father(struct sockaddr_in sddr,
 	using structs::father;
 
 	struct ipport ipp = ipport_get(sddr);
-	bool status = false;
-	int cmp;
+	bool status = false, eq;
 
 	if (!father.status) {
 		return false;
 	}
 
 	mute.lock();
-	cmp = memcmp(msg.hash(), father.info.hash, HASHSIZE);
+	eq = HASHEQ(msg.hash(), father.info.hash);
 
 	if (msg.type() > USER_END && msg.type() < 0x30
-		&& cmp == 0 && father.info.ipp.ip == ipp.ip) {
+		&& eq && father.info.ipp.ip == ipp.ip) {
 		status = true;
 	}
 
@@ -77,32 +79,51 @@ bool father_handler::from_father(struct sockaddr_in sddr,
 	return status;
 }
 /*********************************************************/
-void father_handler::check(void) {
+struct haship father_handler::haship(void) {
 	using structs::father;
 
-	enum udp_type type;
-	pack req;
+	struct haship data;
 
-	if (!structs::father.status) {
-		storage::nodes.temporary_father();
+	mute.lock();
+	HASHCPY(data.hash, father.info.hash);
+	data.ip = (father.status) ? father.info.ipp.ip : string();
+	mute.unlock();
+
+	return data;
+}
+/*********************************************************/
+void father_handler::check(void) {
+	using structs::father;
+	using storage::nodes;
+
+	unsigned char *pub = structs::keys.pub;
+	auto time = system_clock::now();
+	bool cond;
+
+	cond = (father.status && time - ping < 200s)
+		|| (!father.status && time - ping < 3s)
+		|| storage::tasks.exists(REQ_FATHER);
+
+	if (cond) {
 		return;
 	}
 
-	if (system_clock::now() - ping <= 100s
-		|| structs::role == UDP_NONE) {
-		return;
-	}
+	struct client node = storage::nodes.nearest(pub);
+	unsigned char *fhash = father.info.hash;
+	pack msg;
 
-	type = (structs::role == UDP_USER) ? USER_REQ_FATHER
-	                                   : NODE_REQ_FATHER;
-	if (storage::tasks.exists(type)) {
-		return;
+	mute.lock();
+
+	if (father.status && cmp(pub, fhash, node.hash) == 2) {
+		storage::nodes.rm_hash(fhash);
+		father.status = false;
 	}
 
 	ping = system_clock::now();
-	req.tmp(type);
-	storage::tasks.add(req, sddr_get(father.info.ipp),
-	                   father.info.hash);
+	mute.unlock();
+
+	msg.tmp(REQ_FATHER);
+	storage::tasks.add(msg, sddr_get(node.ipp), node.hash);
 }
 /*********************************************************/
 #if defined(DEBUG) && DEBUG == true

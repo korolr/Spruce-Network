@@ -1,70 +1,54 @@
 #include "../include/pack.hpp"
 /*********************************************************/
 pack::pack(unsigned char *buff, size_t size) {
-	unsigned char *bytes = nullptr;
-	int trash;
+	using encryption::unpack;
 
-	correct = false;
-	trash_size = 0;
+	constexpr size_t esize = UDP_PACK + crypto_box_SEALBYTES;
+	unsigned char *bytes;
 
-	if (!buff || size < UDP_PACK) {
+	if (!buff || size < UDP_PACK || size > esize + 200) {
 		return;
 	}
-	// Сообщение может иметь любой размер, главное
-	// условие что бы сообщение было не меньше чем
-	// UDP_PACK + crypto_box_SEALBYTES и финальное
-	// количество байт было четным. Далее сообщение
-	// отчищается от лишнего.
-	trash = size - (UDP_PACK + crypto_box_SEALBYTES);
-	trash = (trash <= 0) ? 0 : trash / 2;
 
-	bytes = encryption::unpack(buff + trash, UDP_PACK);
+	size_t trash = size - esize;
+	trash /= 2;
 
-	if (!bytes) {
+	bytes = unpack(buff + trash, UDP_PACK);
+
+	if (bytes == nullptr) {
 		return;
 	}
 
 	memset(buffer, 0x00,  UDP_PACK);
 	memcpy(buffer, bytes, UDP_PACK);
 
+	correct = VALID_TYPE(*bytes);
 	delete[] bytes;
-	correct = true;
-
-	if ((*buffer >= NODE_END && *buffer != REQ_ROLE
-		&& *buffer != RES_ROLE) || (*buffer >= USER_END
-		&& *buffer < NODE_REQ_PING) || *buffer == 0x0) {
-		correct = false;
-	}
 }
-
+/*********************************************************/
+void pack::set(const unsigned char *info, size_t len) {
+	assert(info && len != 0);
+	memcpy(buffer + 5 + HASHSIZE, info, len);
+}
 /*********************************************************/
 void pack::tmp(enum udp_type type, size_t cookie) {
-	unsigned char t = static_cast<unsigned char>(type);
-	unsigned char *key = structs::keys.pub;
+	using structs::role;
 
-	if (type == INDEFINITE) {
-		correct = false;
-		return;
-	}
+	size_t num = (cookie == 0) ? random_cookie()
+							   : cookie;
+	unsigned char *key = (role == UDP_NODE)
+							   ? structs::keys.pub
+							   : structs::fkeys.pub;
 
-	cookie = (cookie == 0) ? random_cookie() : cookie;
+	memcpy(buffer + HASHSIZE + 1, &num, 4);
+	HASHCPY(buffer + 1, key);
+	memset(buffer, type, 1);
 	correct = true;
-
-	memset(buffer, 0x00, UDP_PACK);
-
-	memcpy(buffer + 1 + HASHSIZE, &cookie, 4);
-	memcpy(buffer + 1, key, HASHSIZE);
-	memcpy(buffer, &t, 1);
 }
 /*********************************************************/
-size_t pack::is_req(void) {
+enum udp_type pack::type(void) {
 	assert(correct);
-
-	if (*buffer > NODE_RES_NODE) {
-		return 0;
-	}
-
-	return (*buffer % 2 == 0) ? 1 : 2;
+	return static_cast<enum udp_type>(*buffer);
 }
 /*********************************************************/
 enum udp_role pack::role(void) {
@@ -83,30 +67,6 @@ enum udp_role pack::role(void) {
 	}
 
 	return UDP_NONE;
-}
-/*********************************************************/
-void pack::set_info(unsigned char *info, size_t len) {
-	assert(info && len != 0);
-	memcpy(buffer + 5 + HASHSIZE, info, len);
-}
-/*********************************************************/
-void pack::add_info(size_t sp, void *bytes, size_t len) {
-	assert(bytes && len != 0);
-	memcpy(buffer + 5 + HASHSIZE + sp, bytes, len);
-}
-/*********************************************************/
-void pack::set_correct(void) {
-	correct = true;
-}
-/*********************************************************/
-unsigned char *pack::bytes(void) {
-	assert(correct);
-	return buffer;
-}
-/*********************************************************/
-enum udp_type pack::type(void) {
-	assert(correct);
-	return static_cast<enum udp_type>(*buffer);
 }
 /*********************************************************/
 bool pack::is_correct(void) {
@@ -132,14 +92,18 @@ size_t pack::cookie(void) {
 	return cookie;
 }
 /*********************************************************/
+void pack::change_cookie(void) {
+	size_t cookie = random_cookie();
+	memcpy(buffer + 1 + HASHSIZE, &cookie, 4);
+}
+/*********************************************************/
 void pack::gentrash_nix(void) {
 	ifstream fd("/dev/urandom", ios::binary);
-	trash_size = (trash_size <= 100 && trash_size > 0) ? trash_size
-													   : 100;
+
 	assert(fd.good());
 
-	fd.read(reinterpret_cast<char *>(right), trash_size);
-	fd.read(reinterpret_cast<char *>(left),  trash_size);
+	fd.read(reinterpret_cast<char *>(right), tsize);
+	fd.read(reinterpret_cast<char *>(left),  tsize);
 	fd.close();
 }
 /*********************************************************/
@@ -154,36 +118,36 @@ string pack::hash_str(void) {
 /*********************************************************/
 struct udp_task pack::to_task(unsigned char *hash,
 							  struct sockaddr_in *sddr) {
-	size_t dop = UDP_PACK + crypto_box_SEALBYTES;
+	size_t const dop = UDP_PACK + crypto_box_SEALBYTES;
 	unsigned char *bytes;
 	struct udp_task task;
 
-	assert(correct && hash);
-	srand(time(nullptr));
-	dop += (trash_size = rand() % 100);
+	assert(correct);
 
 	task.type = static_cast<enum udp_type>(*buffer);
-	memcpy(&task.cookie, buffer + HASHSIZE + 1, 4);
+	memcpy(&task.cookie, buffer +  HASHSIZE + 1, 4);
+
+	srand(time(nullptr));
+
+	tsize = rand() % 99;
+	tsize = (tsize == 0) ? 99 : tsize;
+	task.len = dop + tsize * 2;
 
 	bytes = encryption::pack(hash, buffer, UDP_PACK);
-	assert(bytes);
 
 	if (sddr != nullptr) {
 		task.sddr = *sddr;
 	}
 
 #ifdef _WIN32
-	this->gentrash_win();
+	gentrash_win();
 #else 
-	this->gentrash_nix();
+	gentrash_nix();
 #endif
 
-	memcpy(task.buff + dop, right, trash_size);
-	memcpy(task.buff, left, trash_size);
-	task.len = dop + trash_size;
-
-	dop = UDP_PACK + crypto_box_SEALBYTES;
-	memcpy(task.buff + trash_size, bytes, dop);
+	memcpy(task.buff + tsize + dop, right, tsize);
+	memcpy(task.buff + tsize, bytes, dop);
+	memcpy(task.buff, left, tsize);
 
 	delete[] bytes;
 	return task;
@@ -193,13 +157,11 @@ struct udp_task pack::to_task(unsigned char *hash,
 
 void pack::debug(void) {
 	string hex;
-	//size_t cookie;
 
 	if (!correct) {
 		return;
 	}
 
-	//memcpy(&cookie, buffer + 1 + HASHSIZE, 4);
 	hex = bin2hex(UDP_PACK, buffer);
 
 	for (size_t i = 0; i < hex.length(); i++) {
@@ -211,6 +173,34 @@ void pack::debug(void) {
 	}
 
 	cout << endl << endl;
+}
+
+string pack::type_str(void) {
+	assert(correct);
+
+	switch(*buffer) {
+	case REQ_FATHER: 		return "REQ_FATHER";
+	case RES_FATHER: 		return "RES_FATHER";
+	case REQ_ROLE: 			return "REQ_ROLE";
+	case RES_ROLE: 			return "RES_ROLE";
+	case USER_REQ_PING: 
+	case NODE_REQ_PING: 	return "REQ_PING";
+	case USER_RES_PING: 
+	case NODE_RES_PING: 	return "RES_PING";
+	case USER_REQ_TUNNEL: 
+	case NODE_REQ_TUNNEL: 	return "REQ_TUNNEL";
+	case USER_RES_TUNNEL: 
+	case NODE_RES_TUNNEL: 	return "RES_TUNNEL";
+	case USER_REQ_FIND: 
+	case NODE_REQ_FIND: 	return "REQ_FIND";
+	case USER_RES_FIND: 
+	case NODE_RES_FIND: 	return "RES_FIND";
+	case USER_REQ_PORT: 
+	case NODE_REQ_PORT: 	return "REQ_PORT";
+	case USER_RES_PORT: 
+	case NODE_RES_PORT: 	return "RES_PORT";
+	default: 				return "INDEFINITE";
+	}
 }
 
 #endif

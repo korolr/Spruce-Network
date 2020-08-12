@@ -4,8 +4,8 @@
 
 #include "spruce.hpp"
 #include "storage.hpp"
-#include "tcptunnel.hpp"
 #include "router.hpp"
+#include "pack.hpp"
 
 struct ret {
 	unsigned char hash[HASHSIZE];
@@ -20,7 +20,7 @@ class udp_network {
 		thread thr1, thr2;
 		int sock;
 
-		void processing(struct sockaddr_in, pack);
+		void handling(struct sockaddr_in, pack);
 		void send_package(struct udp_task);
 		void send_thread(void);
 		void recv_thread(void);
@@ -33,82 +33,50 @@ class udp_network {
 			set_sockaddr(recv.sddr, UDP_PORT);
 		}
 		~udp_network(void) {
-			if (!work) { return; }
+			work = false;
 			CLOSE_SOCKET(sock);
 
-			thr1.join();
-			thr2.join();
+			if (thr1.joinable()) {
+				thr1.join();
+			}
+			
+			if (thr2.joinable()) {
+				thr2.join();
+			}
 		}
 };
 
 class handler_queue {
-	private:
-		map<size_t, unsigned char *> queue;
-		mutex mute;
+private:
+	map<size_t, string> queue;
+	mutex mute;
 
-		void add(size_t cookie, unsigned char *hash) {
-			unsigned char *nhash = new unsigned char[HASHSIZE];
-			assert(nhash);
+public:
+	bool lock(pack &msg, string &ip) {
+		mute.lock();
+		auto it = queue.find(msg.cookie());
 
-			HASHCPY(nhash, hash);
-
-			queue.insert(make_pair(cookie, nhash));
-		}
-
-	public:
-		bool lock(pack &msg) {
-			map<size_t, unsigned char *>::iterator it;
-			int cmp;
-
-			mute.lock();
-
-			it = queue.find(msg.cookie());
-
-			if (it == queue.end()) {
-				this->add(msg.cookie(), msg.hash());
-				mute.unlock();
-				return false;
-			}
-
-			assert(it->second);
-			cmp = memcmp(it->second, msg.hash(), HASHSIZE);
-
-			if (cmp != 0) {
-				this->add(msg.cookie(), msg.hash());
-				mute.unlock();
-				return false;
-			}
-
+		if (it != queue.end() && it->second == ip) {
 			mute.unlock();
-
 			return true;
 		}
 
-		void unlock(pack &msg) {
-			map<size_t, unsigned char *>::iterator it;
-			int cmp;
+		queue.insert(make_pair(msg.cookie(), ip));
+		mute.unlock();
+		
+		return false;
+	}
 
-			mute.lock();
-			it = queue.find(msg.cookie());
+	void unlock(pack &msg, string &ip) {
+		mute.lock();
+		auto it = queue.find(msg.cookie());
 
-			if (it == queue.end()) {
-				mute.unlock();
-				return;
-			}
-
-			assert(it->second);
-			cmp = memcmp(it->second, msg.hash(), HASHSIZE);
-
-			if (cmp != 0) {
-				mute.unlock();
-				return;
-			}
-
-			delete[] it->second;
+		if (it != queue.end() && it->second == ip) {
 			queue.erase(it);
-
-			mute.unlock();
 		}
+
+		mute.unlock();
+	}
 };
 
 inline udp_network network;
@@ -117,19 +85,21 @@ namespace handler {
 	inline handler_queue queue;
 
 	struct ret make_ret(struct sockaddr_in,
-						unsigned char *,
-						pack);
+						unsigned char *, pack);
 
-	void node(pack, struct sockaddr_in);
-	void user(pack, struct sockaddr_in);
-	void role(pack, struct sockaddr_in);
+	void father(pack, struct sockaddr_in);
+	void node(pack,   struct sockaddr_in);
+	void user(pack,   struct sockaddr_in);
 }
 
 namespace router {
-	inline tunnels_router	tunnels;
+	//inline tunnels_router	tunnels;
+	inline message_router	message;
 	inline father_router	father;
-	inline nodes_router		nodes;
+	inline port_router		port;
 	inline find_router		find;
+	/*inline nodes_router		nodes;
+	inline verif_router		verif;*/
 }
 
 #endif

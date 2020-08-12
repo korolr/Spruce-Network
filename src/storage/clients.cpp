@@ -5,9 +5,6 @@ void clients_handler::reg(unsigned char *hash,
 						  struct ipport ipp,
 						  enum udp_role role,
 						  bool is_ping) {
-	using structs::keys;
-
-	bool is_node = false;
 	struct client one;
 	
 	if (!hash || role == UDP_NONE || IS_ME(hash)) {
@@ -15,21 +12,27 @@ void clients_handler::reg(unsigned char *hash,
 	}
 
 	if (ipp.port == UDP_PORT && role == UDP_NODE) {
-		is_node = true;
+		one.is_node = true;
 	}
 
 	mute.lock();
 
 	for (auto &p : structs::clients) {
-		if (ipp.ip != p.ipp.ip) {
+		if (ipp != p.ipp) {
 			continue;
 		}
 
 		p.ping = system_clock::now();
 		HASHCPY(p.hash, hash);
-		p.is_node = is_node;
+		p.is_node = one.is_node;
+		p.ipp = ipp;
+
 		mute.unlock();
 		return;
+	}
+
+	if (one.is_node) {
+		storage::nodes.add(hash, ipp.ip);
 	}
 
 	if (!is_ping) {
@@ -39,15 +42,10 @@ void clients_handler::reg(unsigned char *hash,
 
 	one.ping = system_clock::now();
 	HASHCPY(one.hash, hash);
-	one.is_node = is_node;
 	one.ipp = ipp;
 
 	structs::clients.push_back(one);
 	mute.unlock();
-
-	if (is_node) {
-		storage::nodes.add(hash, ipp.ip);
-	}
 }
 /*********************************************************/
 void clients_handler::rm_ip(string ip) {
@@ -63,36 +61,9 @@ void clients_handler::rm_ip(string ip) {
 	it = clients.begin();
 
 	for (; it != clients.end(); it++) {
-		if ((*it).ipp.ip != ip) {
-			continue;
+		if (it->ipp.ip == ip) {
+			clients.erase(it);
 		}
-
-		clients.erase(it);
-		break;
-	}
-
-	mute.unlock();
-}
-/*********************************************************/
-void clients_handler::rm_hash(unsigned char *hash) {
-	using structs::clients;
-
-	vector<struct client>::iterator it;
-
-	if (!hash) {
-		return;
-	}
-
-	mute.lock();
-	it = clients.begin();
-
-	for (; it != clients.end(); it++) {
-		if (memcmp((*it).hash, hash, HASHSIZE) != 0) {
-			continue;
-		}
-
-		clients.erase(it);
-		break;
 	}
 
 	mute.unlock();
@@ -101,75 +72,31 @@ void clients_handler::rm_hash(unsigned char *hash) {
 void clients_handler::check(void) {
 	using structs::clients;
 
-	auto time = system_clock::now();
-	size_t size;
-
 	mute.lock();
 
-	if ((size = clients.size()) == 0) {
-		mute.unlock();
-		return;
-	}
+	auto rmc = [](struct client &one) {
+		return system_clock::now() - one.ping > 8s;
+	};
 
-	for (size_t i = 0; i < size; i++) {
-		if (time - clients[i].ping < 8s) {
-			continue;
-		}
-
-		clients.erase(clients.begin() + i);
-	}
-
+	clients.erase(remove_if(clients.begin(), clients.end(),
+							rmc), clients.end());
 	mute.unlock();
-}
-/*********************************************************/
-bool clients_handler::exists(unsigned char *hash) {
-	bool status = false;
-
-	mute.lock();
-
-	for (auto &p : structs::clients) {
-		if (memcmp(p.hash, hash, HASHSIZE) != 0) {
-			continue;
-		}
-
-		status = true;
-		break;
-	}
-
-	mute.unlock();
-	return status;
-}
-/*********************************************************/
-bool clients_handler::find(unsigned char *hash,
-						   struct client &one) {
-	bool status = false;
-
-	mute.lock();
-
-	for (auto &p : structs::clients) {
-		if (memcmp(p.hash, hash, HASHSIZE) != 0) {
-			continue;
-		}
-
-		status = true;
-		one = p;
-		break;
-	}
-
-	mute.unlock();
-	return status;
 }
 /*********************************************************/
 struct client clients_handler::nearest(unsigned char *hash) {
-	struct client node = structs::father.info;
-	int cmp;
+	using storage::father;
 
+	struct client node = structs::father.info;
+
+	assert(hash);
 	mute.lock();
 
 	for (auto &p : structs::clients) {
-		cmp = storage::father.cmp(hash, p.hash, node.hash);
+		if (!p.is_node) {
+			continue;
+		}
 
-		if (p.is_node && cmp == 1) {
+		if (father.cmp(hash, p.hash, node.hash) == 1) {
 			node = p;
 			continue;
 		}
@@ -177,6 +104,44 @@ struct client clients_handler::nearest(unsigned char *hash) {
 
 	mute.unlock();
 	return node;
+}
+/*********************************************************/
+vector<struct haship> clients_handler::veclist(void) {
+	vector<struct haship> list;
+	struct haship one;
+
+	mute.lock();
+
+	for (auto &p : structs::clients) {
+		if (!p.is_node) {
+			continue;
+		}
+
+		HASHCPY(one.hash, p.hash);
+		one.ip = p.ipp.ip;
+
+		list.push_back(one);
+	}
+
+	mute.unlock();
+
+	return list;
+}
+/*********************************************************/
+vector<struct client> clients_handler::users(void) {
+	vector<struct client> list;
+
+	mute.lock();
+
+	for (auto &p : structs::clients) {
+		if (!p.is_node) {
+			list.push_back(p);
+		}
+	}
+
+	mute.unlock();
+
+	return list;
 }
 /*********************************************************/
 #if defined(DEBUG) && DEBUG == true

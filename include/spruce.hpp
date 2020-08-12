@@ -1,7 +1,7 @@
 
 #ifndef _SPRUCE_MAIN_
 #define _SPRUCE_MAIN_
-
+// upper_bound / sort & function inside / binary_search / constexpr
 #include <iostream>
 #include <sys/socket.h>
 #include <arpa/inet.h>
@@ -25,7 +25,8 @@
 #include <map>
 
 #define HASHSIZE	32
-#define UDP_PACK	HASHSIZE * 4 + 8
+#define INFOSIZE	250 - 65
+#define UDP_PACK	HASHSIZE + 5 + INFOSIZE
 #define MAX_UDPSZ	UDP_PACK + 200 + crypto_box_SEALBYTES
 #define UDP_PORT	2121
 #define TIMEOUT		10
@@ -42,33 +43,35 @@ using chrono::system_clock;
 using chrono::time_point;
 /**
 *	Global spruce structs.
-*	
+*
 */
 enum udp_type : unsigned char {
 	/**
 	*	Universal package types.
 	*/
-	INDEFINITE		= 0x33,
+	INDEFINITE		= 0x35,
 	DOS				= 0x00,
 	REQ_ROLE		= 0x31,
 	RES_ROLE		= 0x32,
+	REQ_FATHER		= 0x33,
+	RES_FATHER		= 0x34,
 	/**
 	*	Types of user package.
 	*/
-	USER_REQ_PING	= 0x01,
+	USER_REQ_PING	= 0x01,			// straight
 	USER_RES_PING	= 0x02,
 
 	USER_REQ_TUNNEL	= 0x03,
 	USER_RES_TUNNEL	= 0x04,
 
-	USER_REQ_FATHER	= 0x05,
-	USER_RES_FATHER	= 0x06,
+	USER_REQ_FIND	= 0x05,			// straight
+	USER_RES_FIND	= 0x06,
 
-	USER_REQ_NODE	= 0x07,
-	USER_RES_NODE	= 0x08,
+	USER_REQ_MSG	= 0x07,
+	USER_RES_MSG	= 0x08,
 
-	USER_REQ_FIND	= 0x09,
-	USER_RES_FIND	= 0x0a,
+	USER_REQ_PORT	= 0x09,			// straight
+	USER_RES_PORT	= 0x0a,
 
 	USER_END		= 0x0b,
 	/**
@@ -80,19 +83,16 @@ enum udp_type : unsigned char {
 	NODE_REQ_TUNNEL	= 0x13,
 	NODE_RES_TUNNEL	= 0x14,
 
-	NODE_REQ_FATHER	= 0x15,
-	NODE_RES_FATHER = 0x16,
+	NODE_REQ_FIND	= 0x15,
+	NODE_RES_FIND	= 0x16,
 
-	NODE_REQ_FIND	= 0x19,
-	NODE_RES_FIND	= 0x1a,
+	NODE_REQ_PORT	= 0x17,
+	NODE_RES_PORT	= 0x18,
 
-	NODE_REQ_ECHO	= 0x1b, // Echo find. If NODE_REQ_FIND doesn't work correct - send NODE_REQ_EFIND 
-	NODE_RES_ECHO	= 0x1c,
+	NODE_REQ_MSG	= 0x19,
+	NODE_RES_MSG	= 0x20,
 
-	NODE_REQ_NODE	= 0x1d,
-	NODE_RES_NODE	= 0x1e,
-
-	NODE_END		= 0x1f
+	NODE_END		= 0x21
 };
 
 struct sddr_structs {
@@ -106,26 +106,44 @@ struct sddr_structs {
 
 struct hashport {
 	unsigned char hash[HASHSIZE];
-	size_t port;
+	size_t port = 0;
+};
 
-	hashport(void) : port(0) { }
+struct haship {
+	unsigned char hash[HASHSIZE];
+	string ip;
 };
 
 struct ipport {
-	size_t port;
-	string ip;
+	size_t port = 0;
+	string ip  = "";
+
+	bool operator==(struct ipport &ipp) {
+		return ipp.ip == ip;
+	}
+
+	bool operator!=(struct ipport &ipp) {
+		return ipp.ip != ip;
+	}
+
+	ipport(size_t p = 0, string i = "")
+		: port(p), ip(i) { };
 };
 
 struct client {
 	unsigned char hash[HASHSIZE];
 	time_point<system_clock> ping;
-	struct ipport ipp;
-	bool is_node;
+	struct ipport ipp = {0, ""};
+	bool is_node = false;
+};
+
+struct client_att : client {
+	size_t attempts = 0, id;
 };
 
 struct udp_father {
 	struct client info;
-	bool status;
+	atomic<bool> status = false;
 };
 
 struct keypair {
@@ -140,23 +158,30 @@ struct udp_task {
 	size_t attempts, len;
 	// For searching.
 	unsigned char hash[HASHSIZE];
-	enum udp_type type;
 	size_t cookie;
+	enum udp_type type;
 };
 
-struct dadreq {
-	unsigned char hash[HASHSIZE];
-	time_point<system_clock> time;
-	struct sockaddr_in sddr;
+enum route_state : unsigned char {
+	FOUND			= 0x02,
+	NFOUND			= 0x01,
+	PROGRESS		= 0x00
 };
 
 struct route {
-	// father & ipp - Node info
-	// hash - client info
-	unsigned char father[HASHSIZE], hash[HASHSIZE];
+	unsigned char hash[HASHSIZE];
+	unsigned char node[HASHSIZE];
 	time_point<system_clock> time;
+	enum route_state status;
 	struct ipport ipp;
-	bool full;
+	size_t code, id;
+};
+
+struct tcp_port {
+	time_point<system_clock> time;
+	unsigned char hash[HASHSIZE];
+	bool confirm = false;
+	size_t port, id;
 };
 
 enum udp_role : unsigned char {
@@ -165,88 +190,29 @@ enum udp_role : unsigned char {
 	UDP_USER		= 0x02
 };
 
-struct msg {
-	time_point<system_clock> time;
-	unsigned char hash[HASHSIZE];
-	size_t attempts;
-	bool done;
-};
-
-struct find {
-	time_point<system_clock> time;
-	unsigned char hash[HASHSIZE];
-	size_t status;
-};
-
-enum tcp_status : unsigned char {
-	NONE			= 0x00,
-	TUNNEL_1		= 0x01,
-	TUNNEL_2		= 0x02,
-	TUNNEL_3		= 0x03,
-
-	CUR_STATUS		= 0x04,
-	WAIT_SEND		= 0x05,
-
-	ERROR_S			= 0x06, // Status error, it wasn't updated more than 15s.
-	ERROR_T			= 0x07  // Tunnel error, if one of 2 threads isn't working.
-};
-
 enum tcp_role : unsigned char {
-	TCP_SENDER		= 0x00,
-	TCP_TARGET		= 0x04,
-	TCP_BINDER1		= 0x01,
-	TCP_BINDER2		= 0x02,
-	TCP_UBINDER		= 0x03 // If users are connected to the same node. binder1 + binder2
+	TCP_NONE		= 0x00,
+	TCP_SENDER 		= 0x01,
+	TCP_BINDER1		= 0x02,
+	TCP_TARGET		= 0x03,
+	TCP_BINDER2		= 0x04
 };
 
-#include "pack.hpp"
-#include "tcptunnel.hpp"
+class spruceapi {
+private:
+	static unsigned char *
+	tunnel_request(unsigned char *, size_t &);
 
-struct tunnel {
-	unsigned char target[HASHSIZE], from[HASHSIZE];
-	unsigned char content[PACKLEN];
-	time_point<system_clock> time;
-	enum tcp_status status;
-	tcp_tunnel send, recv;
-	size_t length;
-	mutex mute;
+	static unsigned char *
+	find_request(unsigned char *, size_t &);
 
-	tunnel(void) : status(NONE), length(0) { }
+	static unsigned char *
+	spruce_status(size_t &);
 
-	pair<size_t, size_t> ports(void) {
-		return make_pair(send.s_port, recv.r_port);
-	}
-
-	bool work(void) {
-		return send.work || recv.work;
-	}
-
-	enum tcp_role role(void) {
-		return (send.work) ? send.role : recv.role;
-	}
+public:
+	static unsigned char *
+	processing(unsigned char *, size_t &);
 };
-
-namespace structs {
-	inline atomic<size_t>				threads = 0;
-	inline vector<struct tunnel *>		tunnels;
-	inline vector<struct client>		clients;
-	inline vector<struct dadreq>		dadreqs;
-	inline vector<struct udp_task>		tasks;
-	inline vector<struct client>		nodes;
-	inline vector<struct route>			routes;
-	inline struct udp_father			father;
-	inline struct keypair				keys;
-	inline enum udp_role				role;
-
-	namespace api {
-		inline vector<struct hashport>	inbox;
-		inline vector<struct find>		finds;
-		inline vector<struct msg>		msgs;
-	}
-}
-
-bool
-is_null(unsigned char *, size_t);
 
 string
 bin2hex(size_t, unsigned char *);
@@ -277,21 +243,8 @@ set_sockaddr(struct sockaddr_in &,
 			 size_t port = 0,
 			 string ip = "");
 
-class userapi {
-	private:
-		static unsigned char *
-		ibox_req(unsigned char *, size_t &);
-
-		static unsigned char *
-		find_req(unsigned char *, size_t &);
-
-		static unsigned char *
-		pack_req(unsigned char *, size_t &);
-
-	public:
-		static unsigned char *
-		processing(unsigned char *, size_t &);
-};
+size_t
+byte_sum(unsigned char *, size_t);
 
 #define THREAD_START()												\
 	if (structs::threads >= PACKLIM) {								\
@@ -312,10 +265,37 @@ class userapi {
 #define IS_FATHER(key)												\
 	(memcmp((key), structs::father.info.hash, HASHSIZE) == 0)
 
+#define IS_NULL(ptr, size)											\
+	(byte_sum((ptr), (size)) == 0)
+
+#define HASHEQ(h1, h2)												\
+	(memcmp((h1), (h2), HASHSIZE) == 0)
+
 #define CLOSE_SOCKET(s)												\
 	if ((s) != 0) {													\
 		shutdown((s), SHUT_RDWR);									\
 		close((s));													\
 	}
+
+#include "tcptunnel.hpp"
+
+namespace structs {
+	inline atomic<size_t>				threads = 0;
+	inline vector<struct client>		clients;
+	inline vector<struct tunnel *>		tunnels;
+	inline vector<struct tcp_port>		ports;
+	inline vector<struct udp_task>		tasks;
+	inline vector<struct client_att>	nodes;
+	inline vector<struct route>			routes;
+	inline struct udp_father			father;
+	inline struct keypair				fkeys;
+	inline struct keypair				keys;
+	inline enum udp_role				role;
+
+	namespace api {
+		//inline vector<struct hashport>	inbox;
+		//inline vector<struct msg>		msgs;
+	}
+}
 
 #endif

@@ -1,193 +1,292 @@
-
+// if not tcp_sender - 
 #include "../../include/storage.hpp"
+/*********************************************************/
+void tunnels_handler::user_create(unsigned char *hash,
+								  enum tcp_role role,
+								  size_t code,
+								  struct haship hi) {
+	using structs::tunnels;
+	using structs::father;
+	using storage::nodes;
 
-void tunnels_handler::add(unsigned char *target,
-						  unsigned char *from,
-						  struct init_tunnel init) {
-	struct tunnel *one;
-	int cmp1, cmp2;
-	bool is_snd, r;
+	vector<struct tunnel *>::iterator it;
+	struct tunnel *tunn;
+	size_t id;
 
-	is_snd = (init.type == TCP_SND) ? true : false;
-	assert(target && from);
-	mute.lock();
+	assert(hash);
 
-	for (auto &p : structs::tunnels) {
-		cmp1 = memcmp(p->target, target, HASHSIZE);
-		cmp2 = memcmp(p->from,   from,   HASHSIZE);
-
-		if (cmp1 != 0 || cmp2 != 0) {
-			continue;
-		}
-
-		r = ((is_snd && p->send.work)
-			|| (!is_snd && p->recv.work));
-
-		if (r) {
-			mute.unlock();
-			return;
-		}
-
-		if (is_snd) {
-			p->send.init(init, p);
-			mute.unlock();
-			return;
-		}
-
-		p->recv.init(init, p);
-		mute.unlock();
+	if (exists_u(hash)) {
 		return;
 	}
 
-	assert(one = new tunnel());
+	auto cmp = [](struct tunnel *tunn, size_t code) {
+		return tunn->code < code;
+	};
 
-	one->time = system_clock::now();
-	HASHCPY(one->target, target);
-	HASHCPY(one->from, from);
-	one->length = 0;
+	assert(tunn = new tunnel());
 
-	structs::tunnels.push_back(one);
+	tunn->code = (role == TCP_SENDER) ? random_cookie() : code;
+	tunn->id = id = byte_sum(hash, HASHSIZE);
+	tunn->time = system_clock::now();
+	tunn->node = nodes.get_notdad();
+	tunn->binder1 = hi;
+	tunn->role = role;
 
-	if (is_snd) {
-		one->send.init(init, one);
-		mute.unlock();
+	HASHCPY(tunn->hash, hash);
+
+	mute.lock();
+
+	it = lower_bound(tunnels.begin(), tunnels.end(), id, cmp);
+	tunnels.insert(it, tunn);
+	
+	mute.unlock();
+
+	port_req(tunn->node.hash, tunn->node.ipp);
+}
+/*********************************************************/
+void tunnels_handler::node_create(struct client user,
+								  enum tcp_role role,
+								  size_t code,
+								  struct haship hi) {
+	using structs::tunnels;
+
+	vector<struct tunnel *>::iterator it;
+	struct tunnel *tunn;
+
+	if (code == 0 || exists_n(role, code)) {
 		return;
 	}
 
-	one->recv.init(init, one);
-	mute.unlock();
-}
+	assert(tunn = new tunnel());
 
-bool tunnels_handler::find_ports(unsigned char *target,
-								 unsigned char *from,
-								 pair<size_t, size_t> &d) {
+	auto cmp = [](struct tunnel *tunn, size_t code) {
+		return tunn->code < code;
+	};
+
+	tunn->time = system_clock::now();
+	tunn->role = role;
+	tunn->user = user;
+	tunn->code = code;
+	tunn->binder1 = hi;
+	HASHCPY(tunn->node.hash, hi.hash);
+	tunn->node.ipp.ip = hi.ip;
+
+	mute.lock();
+
+	it = lower_bound(tunnels.begin(), tunnels.end(), code,
+					 cmp);
+	tunnels.insert(it, tunn);
+
+	mute.unlock();
+
+	if (role == TCP_BINDER2) {
+		port_req(hi.hash, {UDP_PORT, hi.ip});
+	}
+}
+/*********************************************************/
+bool tunnels_handler::find_hash(unsigned char *hash,
+								struct tunnel **one) {
+	using structs::tunnels;
+
+	vector<struct tunnel *>::iterator it;
 	bool status = false;
-	int cmp1, cmp2;
+	size_t id;
 
-	assert(target && from);
+	assert(hash);
+	assert((id = byte_sum(hash, HASHSIZE)) != 0);
+
+	auto cmp = [](struct tunnel *tunn, size_t id) {
+		return tunn->id < id;
+	};
+
 	mute.lock();
+	it = tunnels.begin();
 
-	for (auto &p : structs::tunnels) {
-		cmp1 = memcmp(p->target, target, HASHSIZE);
-		cmp2 = memcmp(p->from,   from,   HASHSIZE);
+	for (;; it++) {
+		it = lower_bound(it, tunnels.end(), id, cmp);
 
-		if (p->status < TUNNEL_3 && cmp1 == 0
-			&& cmp2 == 0) {
-			status = true;
-			d = p->ports();
+		if (it == tunnels.end() || (*it)->id != id) {
+			break;
+		}
+
+		if (HASHEQ((*it)->hash, hash)) {
+			status = true; *one = *it;
 			break;
 		}
 	}
 
 	mute.unlock();
+
 	return status;
 }
-
-bool tunnels_handler::find(unsigned char *target,
-						   unsigned char *from,
-						   enum tcp_role role,
-						   struct tunnel **buff) {
+/*********************************************************/
+bool tunnels_handler::find_code(size_t code, enum tcp_role r,
+								struct tunnel **one) {
+	using structs::tunnels;
+	
+	vector<struct tunnel *>::iterator it;
 	bool status = false;
-	int cmp1, cmp2;
 
-	assert(target && from);
+	assert(code != 0 && r != TCP_NONE);
+
+	auto cmp = [](struct tunnel *tunn, size_t code) {
+		return tunn->code < code;
+	};
+
 	mute.lock();
+	it = tunnels.begin();
 
-	*buff = nullptr;
+	for (;; it++) {
+		it = lower_bound(it, tunnels.end(), code, cmp);
 
-	for (auto &p : structs::tunnels) {
-		cmp1 = memcmp(p->target, target, HASHSIZE);
-		cmp2 = memcmp(p->from, from, HASHSIZE);
+		if (it == tunnels.end() || (*it)->code != code) {
+			break;
+		}
 
-		if (cmp1 == 0 && cmp2 == 0
-			&& p->role() == role) {
-			status = true;
-			*buff = p;
+		if ((*it)->role == r) {
+			status = true; *one = *it;
 			break;
 		}
 	}
 
 	mute.unlock();
-	return status;
+
+	return status;		
 }
+/*********************************************************/
+void tunnels_handler::port_req(unsigned char *hash,
+							   struct ipport ipp) {
+	req_port req;
+	size_t port;
+	pack msg;
 
-size_t tunnels_handler::free_port(void) {
-	pair<size_t, size_t> t_ports;
-	vector<size_t>::iterator it;
-	vector<size_t> list;
-	size_t port = 49160;
+	assert(hash);
 
-	mute.lock();
+	port = storage::ports.try_reg(hash);
+	req.port(port);
+	msg.from(req);
 
-	for (auto &p : structs::tunnels) {
-		t_ports = p->ports();
-		list.push_back(t_ports.first);
-		list.push_back(t_ports.second);
+	storage::tasks.add(msg, sddr_get(ipp), hash);
+}
+/*********************************************************/
+bool tunnels_handler::exists_n(enum tcp_role role,
+							   size_t code) {
+	struct tunnel *res;
+	return find_code(code, role, &res);
+} 
+/*********************************************************/
+bool tunnels_handler::exists_u(unsigned char *hash) {
+	struct tunnel *res;
+
+	assert(hash);
+	return find_hash(hash, &res);
+}
+/*********************************************************/
+void tunnels_handler::sync(struct tunnel *tunn) {
+	using storage::nodes;
+	using storage::tasks;
+
+	bool b = tunn->role == TCP_BINDER2;
+	bool s = tunn->role == TCP_SENDER;
+	bool t = tunn->role == TCP_TARGET;
+
+	struct tcp_port p;
+	req_tunnel req;
+	pack msg;
+
+	bool ext = storage::ports.find(tunn->node.hash, p);
+
+	if (!ext && (s || t)) {
+		tunn->node = nodes.get_notdad(tunn->node.hash);
+		tunn->time = system_clock::now();
+
+		port_req(tunn->node.hash, tunn->node.ipp);
 	}
 
-	for (;; port++) {
-		it = std::find(list.begin(), list.end(), port);
-		assert(port != 0);
-
-		if (it == list.end()
-			&& this->sys_freeport(port)) {
-			break;
-		}
+	if (!ext || !p.confirm) {
+		return;
 	}
 
-	mute.unlock();
-	return port;
-}
+	tunn->tcp.start(s, p.port);
+	tunn->time = system_clock::now();
 
-bool tunnels_handler::sys_freeport(size_t port) {
-	int tsock = socket(AF_INET, SOCK_STREAM, 0);
-	socklen_t sz = sizeof(struct sockaddr_in);
-	bool status;
+	storage::ports.rm_port(p.port);
 
-	st.sddr.sin_port = htons(port);
+	req.role(tunn->role);
+	req.code(tunn->code);
 
-	status = bind(tsock, st.ptr, sz) == 0;
-	CLOSE_SOCKET(tsock);
-
-	return status;
-}
-
-bool tunnels_handler::is_freeport(size_t port) {
-	pair<size_t, size_t> t_ports;
-	vector<size_t>::iterator it;
-	vector<size_t> list;
-
-	mute.lock();
-
-	for (auto &p : structs::tunnels) {
-		t_ports = p->ports();
-		list.push_back(t_ports.first);
-		list.push_back(t_ports.second);
+	if (t) {
+		req.hash(tunn->binder1.hash);
+		req.ipaddr(tunn->binder1.ip);
 	}
 
-	mute.unlock();
+	if (s) {
+		msg_request(tunn);
+	}
 
-	it = std::find(list.begin(), list.end(), port);
-	return it == list.end();
+	tunn->node.ipp.port = UDP_PORT;
+	tunn->node.ipp.ip = (b) ? tunn->node.ipp.ip
+							: tunn->binder1.ip;
+	msg.from(req);
+
+	tasks.add(msg, sddr_get(tunn->node.ipp),
+			 (b) ? tunn->binder1.hash : tunn->node.hash);
 }
+/*********************************************************/
+void tunnels_handler::msg_request(struct tunnel *tunn) {
+	using structs::father;
+	using storage::tasks;
+	using storage::routes;
 
+	struct haship hi;
+	struct route to;
+	req_msg req;
+	pack msg;
+
+	if (!routes.find(tunn->hash, to) || to.status != FOUND) {
+		return;
+	}
+
+	HASHCPY(hi.hash, to.node);
+	hi.ip = to.ipp.ip;
+
+	req.ipaddr(tunn->node.ipp.ip, tunn->hash);
+	req.from(structs::keys.pub, tunn->hash);
+	req.hash(tunn->node.hash, tunn->hash);
+	req.code(tunn->code, tunn->hash);
+	req.resend(hi);
+
+	msg.from(req);
+
+	tasks.add(msg, sddr_get(father.info.ipp), father.info.hash);
+}
+/*********************************************************/
 void tunnels_handler::check(void) {
 	using structs::tunnels;
 
-	size_t size;
+	auto time = system_clock::now();
+	struct tunnel *tunn;
 
 	mute.lock();
-
-	if ((size = tunnels.size()) == 0) {
-		mute.unlock();
-		return;
-	}
+	size_t size = tunnels.size();
 
 	for (size_t i = 0; i < size; i++) {
-		if (!tunnels[i]->work()) {
-			tunnels[i]->mute.unlock();
-			delete tunnels[i];
+		tunn = tunnels[i];
+
+		if (tunn->role != TCP_BINDER1 && !tunn->sync()) {
+			sync(tunn);
+		}
+
+		if (tunn->sync() && !tunn->tcp.work) {
 			tunnels.erase(tunnels.begin() + i);
+			delete tunn;
+			continue;
+		}
+
+		if (!tunn->sync() && time - tunn->time > 20s) {
+			tunnels.erase(tunnels.begin() + i);
+			delete tunn;
+			continue;
 		}
 	}
 
