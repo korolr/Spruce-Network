@@ -13,7 +13,7 @@ services:
         ports:
             - 1122:1122
         network_mode: host
-        command: "ls"
+        command: "./spruce"
     network_2:
         restart: always
         build:

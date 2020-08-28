@@ -8,8 +8,8 @@ $role_list = array(
 define("HASHSIZE", 32);
 
 $req = "\x01";
-$API_address = "localhost";
-$API_port = 2122;
+$API_address = "network_1";
+$API_port = 1122;
 
 $sock = socket_create(AF_INET, SOCK_STREAM, SOL_TCP);
 socket_connect($sock, $API_address, $API_port);
