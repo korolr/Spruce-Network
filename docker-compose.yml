@@ -1,0 +1,73 @@
+version: "3"
+
+services:
+  network_1:
+    restart: always
+    build:
+      context: ./
+      dockerfile: Dockerfile
+    volumes:
+      - ./:/src
+    expose:
+      - 1122
+    ports:
+      - 1122:1122
+    network_mode: host
+    command: "./spruce"
+  network_2:
+    restart: always
+    build:
+      context: ./
+      dockerfile: Dockerfile
+    volumes:
+      - ./:/src
+    expose:
+      - 1123
+    ports:
+      - 1123:1123
+    network_mode: host
+    command: "./spruce"
+  network_3:
+    restart: always
+    build:
+      context: ./
+      dockerfile: Dockerfile
+    volumes:
+      - ./:/src
+    expose:
+      - 1124
+    ports:
+      - 1124:1124
+    network_mode: host
+    command: "./spruce"
+  network_4:
+    restart: always
+    build:
+      context: ./
+      dockerfile: Dockerfile
+    volumes:
+      - ./:/src
+    expose:
+      - 1155
+    ports:
+      - 1155:1155
+    network_mode: host
+    command: "./spruce"
+  test_find:
+    restart: always
+    build:
+      context: ./
+      dockerfile: Dockerfile
+    volumes:
+      - ./:/src
+    network_mode: host
+    command: "php -f find.php"
+  test_find:
+    restart: always
+    build:
+      context: ./
+      dockerfile: Dockerfile
+    volumes:
+      - ./:/src
+    network_mode: host
+    command: "php -f status.php"
